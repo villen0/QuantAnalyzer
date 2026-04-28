@@ -29,11 +29,7 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: '#e2e8f0' }}>{info.ticker}</span>
               <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 400 }}>{info.name}</span>
-              {info._source === 'mock' && (
-                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 12, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', fontWeight: 600 }}>
-                  DEMO DATA
-                </span>
-              )}
+
               {info.sector !== 'N/A' && (
                 <span style={{
                   fontSize: 11, padding: '2px 8px', borderRadius: 20,
