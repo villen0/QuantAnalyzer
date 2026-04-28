@@ -1,7 +1,10 @@
 import axios from 'axios';
 import type { DashboardData, AIAnalysis, Trade } from '../types';
 
-const api = axios.create({ baseURL: '/api', timeout: 60000 });
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+const api = axios.create({ baseURL: BASE, timeout: 60000 });
 
 export const fetchDashboard = (ticker: string, period = '3mo'): Promise<DashboardData> =>
   api.get(`/full/${ticker}?period=${period}`).then(r => r.data);
