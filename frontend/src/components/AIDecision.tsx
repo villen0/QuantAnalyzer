@@ -26,11 +26,11 @@ const trendIcon = (t: string) => {
 const sentimentColor = (s: string) => ({ bullish: '#10b981', bearish: '#ef4444', neutral: '#94a3b8', mixed: '#f59e0b' }[s] || '#94a3b8');
 
 export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
-  const [apiKey, setApiKey] = useState(localStorage.getItem('anthropic_key') || '');
+  const [apiKey, setApiKey] = useState(localStorage.getItem('groq_key') || '');
   const [showKeyInput, setShowKeyInput] = useState(false);
 
   const handleAnalyze = () => {
-    if (apiKey) localStorage.setItem('anthropic_key', apiKey);
+    if (apiKey) localStorage.setItem('groq_key', apiKey);
     onAnalyze(apiKey);
   };
 
@@ -53,7 +53,7 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
                 type="text"
                 value={apiKey}
                 onChange={e => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
+                placeholder="gsk_..."
                 style={{ flex: 1, fontSize: 13 }}
               />
               <button
@@ -72,7 +72,7 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
                 marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
-              {apiKey ? '✓ API Key set — click to update' : '⚙ Set Anthropic API Key (optional)'}
+              {apiKey ? '✓ API Key set — click to update' : '⚙ Set Groq API Key (optional)'}
             </button>
           )}
         </div>
