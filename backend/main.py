@@ -15,9 +15,11 @@ from trade_logger import log_trade, log_analysis, get_trades, get_analysis_log, 
 
 app = FastAPI(title="QuantAnalyzer API", version="1.0.0")
 
+_origins_env = os.environ.get("ALLOW_ORIGINS", "*")
+_origins = ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -198,4 +200,5 @@ def list_analysis_log(ticker: Optional[str] = Query(None), limit: int = Query(20
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
