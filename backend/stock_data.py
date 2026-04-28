@@ -1,62 +1,99 @@
-import yfinance as yf
+import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json,text/plain,*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
-def _live_available(ticker: str) -> bool:
-    """Quick check if Yahoo Finance is reachable."""
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="2d", timeout=4)
-        return not hist.empty
-    except Exception:
-        return False
+_PERIOD_MAP = {
+    "1mo": "1mo", "3mo": "3mo", "6mo": "6mo",
+    "1y": "1y", "2y": "2y", "5y": "5y",
+}
+
+
+def _chart(ticker: str, period: str = "3mo", interval: str = "1d") -> dict:
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+    params = {
+        "range": _PERIOD_MAP.get(period, "3mo"),
+        "interval": interval,
+        "includePrePost": "false",
+        "events": "div,splits",
+    }
+    r = requests.get(url, params=params, headers=_HEADERS, timeout=15)
+    r.raise_for_status()
+    result = r.json()["chart"]["result"]
+    if not result:
+        raise ValueError(f"No chart data for {ticker}")
+    return result[0]
+
+
+def _summary(ticker: str, modules: str) -> dict:
+    url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
+    r = requests.get(url, params={"modules": modules}, headers=_HEADERS, timeout=15)
+    r.raise_for_status()
+    result = r.json().get("quoteSummary", {}).get("result")
+    if not result:
+        raise ValueError(f"No summary data for {ticker}")
+    return result[0]
+
+
+def _raw(d: dict, key: str):
+    """Extract .raw from Yahoo Finance value dicts, or return scalar."""
+    val = d.get(key)
+    if isinstance(val, dict):
+        return val.get("raw")
+    return val
 
 
 def fetch_stock_info(ticker: str) -> dict:
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        if info is None or not isinstance(info, dict):
-            raise ValueError("No info returned")
-        # Check we got something useful
-        if not info.get("longName") and not info.get("shortName") and not info.get("currentPrice"):
-            raise ValueError("Empty info")
+        s = _summary(
+            ticker,
+            "summaryDetail,financialData,defaultKeyStatistics,assetProfile,price",
+        )
+        pm = s.get("price", {})
+        sd = s.get("summaryDetail", {})
+        fd = s.get("financialData", {})
+        ks = s.get("defaultKeyStatistics", {})
+        ap = s.get("assetProfile", {})
+
         return {
             "ticker": ticker.upper(),
-            "name": info.get("longName") or info.get("shortName", ticker.upper()),
-            "sector": info.get("sector", "N/A"),
-            "industry": info.get("industry", "N/A"),
-            "market_cap": info.get("marketCap"),
-            "pe_ratio": info.get("trailingPE"),
-            "forward_pe": info.get("forwardPE"),
-            "pb_ratio": info.get("priceToBook"),
-            "ps_ratio": info.get("priceToSalesTrailing12Months"),
-            "dividend_yield": info.get("dividendYield"),
-            "beta": info.get("beta"),
-            "52w_high": info.get("fiftyTwoWeekHigh"),
-            "52w_low": info.get("fiftyTwoWeekLow"),
-            "avg_volume": info.get("averageVolume"),
-            "eps": info.get("trailingEps"),
-            "forward_eps": info.get("forwardEps"),
-            "revenue": info.get("totalRevenue"),
-            "gross_margins": info.get("grossMargins"),
-            "operating_margins": info.get("operatingMargins"),
-            "profit_margins": info.get("profitMargins"),
-            "debt_to_equity": info.get("debtToEquity"),
-            "free_cashflow": info.get("freeCashflow"),
-            "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
-            "target_mean_price": info.get("targetMeanPrice"),
-            "recommendation": info.get("recommendationKey", "N/A"),
-            "num_analyst_opinions": info.get("numberOfAnalystOpinions"),
-            "short_ratio": info.get("shortRatio"),
-            "short_percent_of_float": info.get("shortPercentOfFloat"),
-            "earnings_date": str(info.get("earningsTimestamp", "")) if info.get("earningsTimestamp") else None,
-            "description": info.get("longBusinessSummary", ""),
-            "website": info.get("website", ""),
-            "country": info.get("country", ""),
-            "employees": info.get("fullTimeEmployees"),
+            "name": _raw(pm, "longName") or _raw(pm, "shortName") or ticker.upper(),
+            "sector": ap.get("sector", "N/A"),
+            "industry": ap.get("industry", "N/A"),
+            "market_cap": _raw(pm, "marketCap"),
+            "pe_ratio": _raw(sd, "trailingPE"),
+            "forward_pe": _raw(sd, "forwardPE"),
+            "pb_ratio": _raw(ks, "priceToBook"),
+            "ps_ratio": _raw(sd, "priceToSalesTrailing12Months"),
+            "dividend_yield": _raw(sd, "dividendYield"),
+            "beta": _raw(sd, "beta"),
+            "52w_high": _raw(sd, "fiftyTwoWeekHigh"),
+            "52w_low": _raw(sd, "fiftyTwoWeekLow"),
+            "avg_volume": _raw(sd, "averageVolume"),
+            "eps": _raw(ks, "trailingEps"),
+            "forward_eps": _raw(ks, "forwardEps"),
+            "revenue": _raw(fd, "totalRevenue"),
+            "gross_margins": _raw(fd, "grossMargins"),
+            "operating_margins": _raw(fd, "operatingMargins"),
+            "profit_margins": _raw(fd, "profitMargins"),
+            "debt_to_equity": _raw(fd, "debtToEquity"),
+            "free_cashflow": _raw(fd, "freeCashflow"),
+            "current_price": _raw(pm, "regularMarketPrice"),
+            "target_mean_price": _raw(fd, "targetMeanPrice"),
+            "recommendation": _raw(fd, "recommendationKey") or "N/A",
+            "num_analyst_opinions": _raw(fd, "numberOfAnalystOpinions"),
+            "short_ratio": _raw(ks, "shortRatio"),
+            "short_percent_of_float": _raw(ks, "shortPercentOfFloat"),
+            "description": ap.get("longBusinessSummary", ""),
+            "website": ap.get("website", ""),
+            "country": ap.get("country", ""),
+            "employees": ap.get("fullTimeEmployees"),
             "_source": "live",
         }
     except Exception:
@@ -66,30 +103,53 @@ def fetch_stock_info(ticker: str) -> dict:
         return result
 
 
+def _parse_chart(res: dict) -> list[dict]:
+    """Convert raw chart API response to OHLCV record list."""
+    timestamps = res.get("timestamp", [])
+    quote = res["indicators"]["quote"][0]
+    opens = quote.get("open") or []
+    highs = quote.get("high") or []
+    lows = quote.get("low") or []
+    closes = quote.get("close") or []
+    volumes = quote.get("volume") or []
+
+    records = []
+    for i, ts in enumerate(timestamps):
+        c = closes[i] if i < len(closes) else None
+        if c is None:
+            continue
+        records.append({
+            "date": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            "open": round(float(opens[i] if i < len(opens) and opens[i] is not None else c), 4),
+            "high": round(float(highs[i] if i < len(highs) and highs[i] is not None else c), 4),
+            "low": round(float(lows[i] if i < len(lows) and lows[i] is not None else c), 4),
+            "close": round(float(c), 4),
+            "volume": int(volumes[i]) if i < len(volumes) and volumes[i] is not None else 0,
+        })
+    return records
+
+
 def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
     try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(period=period, interval=interval, timeout=10)
-        if df.empty:
-            raise ValueError("Empty dataframe")
-        df.index = pd.to_datetime(df.index)
-        df.index = df.index.tz_localize(None)
+        res = _chart(ticker, period, interval)
+        bars = _parse_chart(res)
+        if not bars:
+            raise ValueError("Empty bars")
+        df = pd.DataFrame([{
+            "Open": b["open"], "High": b["high"], "Low": b["low"],
+            "Close": b["close"], "Volume": b["volume"],
+            "Dividends": 0, "Stock Splits": 0,
+        } for b in bars])
+        df.index = pd.to_datetime([b["date"] for b in bars])
         return df
     except Exception:
-        # Build mock DataFrame
         from mock_data import mock_ohlcv_for_chart
         bars = mock_ohlcv_for_chart(ticker, period)
-        records = []
-        for b in bars:
-            records.append({
-                "Open": b["open"],
-                "High": b["high"],
-                "Low": b["low"],
-                "Close": b["close"],
-                "Volume": b["volume"],
-                "Dividends": 0,
-                "Stock Splits": 0,
-            })
+        records = [{
+            "Open": b["open"], "High": b["high"], "Low": b["low"],
+            "Close": b["close"], "Volume": b["volume"],
+            "Dividends": 0, "Stock Splits": 0,
+        } for b in bars]
         if not records:
             return pd.DataFrame()
         df = pd.DataFrame(records)
@@ -99,23 +159,11 @@ def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.Da
 
 def fetch_ohlcv_for_chart(ticker: str, period: str = "3mo", interval: str = "1d") -> list:
     try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(period=period, interval=interval, timeout=10)
-        if df.empty:
+        res = _chart(ticker, period, interval)
+        bars = _parse_chart(res)
+        if not bars:
             raise ValueError("Empty")
-        df.index = pd.to_datetime(df.index)
-        df.index = df.index.tz_localize(None)
-        records = []
-        for ts, row in df.iterrows():
-            records.append({
-                "date": ts.strftime("%Y-%m-%d %H:%M"),
-                "open": round(float(row["Open"]), 2),
-                "high": round(float(row["High"]), 2),
-                "low": round(float(row["Low"]), 2),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row["Volume"]),
-            })
-        return records
+        return bars
     except Exception:
         from mock_data import mock_ohlcv_for_chart
         return mock_ohlcv_for_chart(ticker, period)
@@ -123,23 +171,21 @@ def fetch_ohlcv_for_chart(ticker: str, period: str = "3mo", interval: str = "1d"
 
 def fetch_realtime_price(ticker: str) -> dict:
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        if not info:
-            raise ValueError("No info")
-        price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose")
-        prev_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
+        res = _chart(ticker, "5d", "1d")
+        meta = res["meta"]
+        price = meta.get("regularMarketPrice") or meta.get("previousClose")
+        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose") or price
         if not price:
-            raise ValueError("No price")
-        change = price - prev_close if price and prev_close else 0
-        change_pct = (change / prev_close * 100) if prev_close else 0
+            raise ValueError("No price in meta")
+        change = float(price) - float(prev_close) if prev_close else 0.0
+        change_pct = (change / float(prev_close) * 100) if prev_close else 0.0
         return {
             "ticker": ticker.upper(),
-            "price": round(price, 2),
-            "prev_close": round(prev_close, 2) if prev_close else None,
+            "price": round(float(price), 2),
+            "prev_close": round(float(prev_close), 2) if prev_close else None,
             "change": round(change, 2),
             "change_pct": round(change_pct, 2),
-            "volume": info.get("volume") or info.get("regularMarketVolume"),
+            "volume": meta.get("regularMarketVolume"),
             "timestamp": datetime.utcnow().isoformat(),
             "_source": "live",
         }
@@ -152,19 +198,19 @@ def fetch_realtime_price(ticker: str) -> dict:
 
 def fetch_earnings_history(ticker: str) -> list:
     try:
-        stock = yf.Ticker(ticker)
-        earnings = stock.quarterly_earnings
-        if earnings is None or earnings.empty:
-            raise ValueError("No earnings")
+        s = _summary(ticker, "earningsHistory")
+        history = s.get("earningsHistory", {}).get("history", [])
+        if not history:
+            raise ValueError("No earnings history")
         records = []
-        for idx, row in earnings.iterrows():
+        for item in history[:4]:
             records.append({
-                "quarter": str(idx),
-                "actual": row.get("Actual"),
-                "estimate": row.get("Estimate"),
-                "surprise_pct": row.get("Surprise(%)"),
+                "quarter": item.get("period", ""),
+                "actual": _raw(item, "epsActual"),
+                "estimate": _raw(item, "epsEstimate"),
+                "surprise_pct": _raw(item, "surprisePercent"),
             })
-        return records[:4]
+        return records
     except Exception:
         from mock_data import mock_earnings
         return mock_earnings(ticker)
