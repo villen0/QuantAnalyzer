@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
@@ -196,6 +198,12 @@ def remove_trade(trade_id: int):
 def list_analysis_log(ticker: Optional[str] = Query(None), limit: int = Query(20)):
     logs = get_analysis_log(ticker, limit)
     return {"logs": logs, "count": len(logs)}
+
+
+# Serve built React frontend — must be registered after all API routes
+_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if _dist.exists():
+    app.mount("/", StaticFiles(directory=str(_dist), html=True), name="static")
 
 
 if __name__ == "__main__":
