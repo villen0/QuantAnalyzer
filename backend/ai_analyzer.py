@@ -1,15 +1,13 @@
 import os
 import json
-import anthropic
+from groq import Groq
 from typing import Optional
 
 
 def build_analysis_prompt(ticker: str, info: dict, indicators: dict, news: list, chart_data: list) -> str:
-    # Summarize recent price action
     recent_prices = chart_data[-10:] if len(chart_data) >= 10 else chart_data
     price_summary = ", ".join([f"{d['date'][:10]}: ${d['close']}" for d in recent_prices])
 
-    # Summarize news headlines with sentiment
     news_summary = ""
     if news:
         for n in news[:8]:
@@ -124,28 +122,29 @@ Be precise with price levels. Reference specific indicator values. Make a defini
 
 
 def analyze_stock(ticker: str, info: dict, indicators: dict, news: list, chart_data: list, api_key: Optional[str] = None) -> dict:
-    key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    key = api_key or os.environ.get("GROQ_API_KEY", "")
     if not key:
         return _fallback_analysis(ticker, indicators, info)
 
-    client = anthropic.Anthropic(api_key=key)
+    client = Groq(api_key=key)
     prompt = build_analysis_prompt(ticker, info, indicators, news, chart_data)
 
     try:
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             max_tokens=2048,
-            system="You are an elite quantitative analyst. Always respond with valid JSON only. No markdown, no extra text.",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are an elite quantitative analyst. Always respond with valid JSON only. No markdown, no extra text."},
+                {"role": "user", "content": prompt},
+            ],
         )
-        raw = message.content[0].text.strip()
-        # Strip markdown code fences if present
+        raw = completion.choices[0].message.content.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
         result = json.loads(raw)
-        result["source"] = "claude-sonnet-4-6"
+        result["source"] = "groq-llama-3.3-70b"
         result["ticker"] = ticker.upper()
         return result
     except json.JSONDecodeError as e:
@@ -232,14 +231,14 @@ def _fallback_analysis(ticker: str, indicators: dict, info: dict) -> dict:
             "overall": "bullish" if price_above_sma200 else "bearish",
         },
         "technical_summary": f"Rule-based analysis: RSI at {rsi:.1f}, MACD {'above' if macd and macd_signal and macd > macd_signal else 'below'} signal. Price is {'above' if price_above_sma200 else 'below'} SMA200.",
-        "fundamental_summary": f"P/E: {info.get('pe_ratio', 'N/A')}, Market Cap: ${info.get('market_cap', 0):,.0f}. Add ANTHROPIC_API_KEY for full AI analysis.",
-        "risk_factors": ["No API key — analysis is rule-based only", "Verify with full Claude AI analysis"],
+        "fundamental_summary": f"P/E: {info.get('pe_ratio', 'N/A')}, Market Cap: ${info.get('market_cap', 0):,.0f}. Add GROQ_API_KEY for full AI analysis.",
+        "risk_factors": ["No API key — analysis is rule-based only", "Verify with full Groq AI analysis"],
         "catalysts": ["Technical setup based on indicators"],
         "news_sentiment": "neutral",
         "key_levels": {
             "must_hold": sr.get("s1") or sr.get("support"),
             "breakout_target": sr.get("r1") or sr.get("resistance"),
         },
-        "reasoning": f"Score-based decision ({score} points). Set ANTHROPIC_API_KEY environment variable for comprehensive AI analysis using Citadel, Morgan Stanley, Bridgewater, and Renaissance frameworks.",
+        "reasoning": f"Score-based decision ({score} points). Set GROQ_API_KEY environment variable for comprehensive AI analysis using Citadel, Morgan Stanley, Bridgewater, and Renaissance frameworks.",
         "source": "rule-based-fallback",
     }
