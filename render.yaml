@@ -13,10 +13,10 @@ services:
       - key: ALLOW_ORIGINS
         fromService:
           name: quantanalyzer-app
-          type: static
+          type: static_site
           property: host
 
-  - type: static
+  - type: static_site
     name: quantanalyzer-app
     rootDir: frontend
     buildCommand: npm install && npm run build
