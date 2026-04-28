@@ -1,3 +1,5 @@
+import re
+import time
 import requests
 import pandas as pd
 from datetime import datetime, timezone
@@ -21,19 +23,61 @@ _crumb: str | None = None
 _crumb_lock = Lock()
 
 
+def _fetch_crumb() -> str:
+    """Fetch Yahoo Finance crumb with retry on 429 and HTML fallback."""
+    # Warm up session cookies
+    _session.get("https://finance.yahoo.com/", timeout=12)
+
+    # Try both hosts; retry up to 3 times with backoff on 429
+    for host in ("query1", "query2"):
+        for attempt in range(3):
+            try:
+                if attempt:
+                    time.sleep(2 ** attempt)  # 2s, 4s
+                r = _session.get(
+                    f"https://{host}.finance.yahoo.com/v1/test/getcrumb",
+                    timeout=12,
+                )
+                if r.status_code == 429:
+                    continue
+                r.raise_for_status()
+                crumb = r.text.strip()
+                if crumb and len(crumb) > 3:
+                    return crumb
+            except Exception:
+                pass
+
+    # Last resort: extract crumb embedded in Yahoo Finance page HTML
+    for page_url in (
+        "https://finance.yahoo.com/quote/AAPL/",
+        "https://finance.yahoo.com/",
+    ):
+        try:
+            r = _session.get(page_url, timeout=15)
+            m = re.search(r'"crumb"\s*:\s*"([^"]{5,20})"', r.text)
+            if m:
+                return m.group(1)
+        except Exception:
+            pass
+
+    raise RuntimeError(
+        "Yahoo Finance is temporarily rate-limiting this server. "
+        "Please wait a few seconds and try again."
+    )
+
+
 def _ensure_crumb() -> str:
     global _crumb
     with _crumb_lock:
         if _crumb:
             return _crumb
-        _session.get("https://finance.yahoo.com/", timeout=10)
-        r = _session.get(
-            "https://query2.finance.yahoo.com/v1/test/getcrumb",
-            timeout=10,
-        )
-        r.raise_for_status()
-        _crumb = r.text.strip()
+        _crumb = _fetch_crumb()
         return _crumb
+
+
+def warmup():
+    """Call once at server startup to pre-fetch the crumb before requests arrive."""
+    _ensure_crumb()
 
 
 def _reset_crumb():
@@ -48,6 +92,9 @@ def _get(url: str, params: dict) -> requests.Response:
     if r.status_code in (401, 403):
         _reset_crumb()
         params["crumb"] = _ensure_crumb()
+        r = _session.get(url, params=params, timeout=15)
+    if r.status_code == 429:
+        time.sleep(3)
         r = _session.get(url, params=params, timeout=15)
     r.raise_for_status()
     return r
