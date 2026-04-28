@@ -1,0 +1,2 @@
+# QuantAnalyzer
+Stock Analysis Dashboard
