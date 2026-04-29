@@ -5,6 +5,17 @@ from typing import Optional
 
 
 def build_analysis_prompt(ticker: str, info: dict, indicators: dict, news: list, chart_data: list) -> str:
+    # Safe formatters for potentially-None info values
+    def n(v, decimals=2):
+        return f"{v:.{decimals}f}" if v is not None else "N/A"
+    def m(v):
+        if v is None: return "N/A"
+        if abs(v) >= 1e12: return f"${v/1e12:.2f}T"
+        if abs(v) >= 1e9:  return f"${v/1e9:.2f}B"
+        if abs(v) >= 1e6:  return f"${v/1e6:.2f}M"
+        return f"${v:,.0f}"
+    def pct(v):
+        return f"{(v or 0)*100:.1f}%" if v is not None else "N/A"
     recent_prices = chart_data[-10:] if len(chart_data) >= 10 else chart_data
     price_summary = ", ".join([f"{d['date'][:10]}: ${d['close']}" for d in recent_prices])
 
@@ -35,14 +46,14 @@ Analyze {ticker} ({info.get('name', ticker)}) and produce a comprehensive tradin
 COMPANY OVERVIEW
 ═══════════════════════════════════════
 Sector: {info.get('sector', 'N/A')} | Industry: {info.get('industry', 'N/A')}
-Market Cap: ${info.get('market_cap', 0):,.0f} | Beta: {info.get('beta', 'N/A')}
-Current Price: ${current_price} | 52W High: ${info.get('52w_high', 'N/A')} | 52W Low: ${info.get('52w_low', 'N/A')}
-P/E: {info.get('pe_ratio', 'N/A')} | Forward P/E: {info.get('forward_pe', 'N/A')} | P/B: {info.get('pb_ratio', 'N/A')}
-EPS (TTM): {info.get('eps', 'N/A')} | Revenue: ${info.get('revenue', 0):,.0f}
-Gross Margin: {(info.get('gross_margins', 0) or 0)*100:.1f}% | Op Margin: {(info.get('operating_margins', 0) or 0)*100:.1f}% | Net Margin: {(info.get('profit_margins', 0) or 0)*100:.1f}%
-Debt/Equity: {info.get('debt_to_equity', 'N/A')} | Free Cash Flow: ${info.get('free_cashflow', 0):,.0f}
-Analyst Target: ${info.get('target_mean_price', 'N/A')} | Analyst Consensus: {info.get('recommendation', 'N/A').upper()}
-Short Ratio: {info.get('short_ratio', 'N/A')} | Short % Float: {(info.get('short_percent_of_float', 0) or 0)*100:.1f}%
+Market Cap: {m(info.get('market_cap'))} | Beta: {info.get('beta') or 'N/A'}
+Current Price: ${current_price} | 52W High: {info.get('52w_high') or 'N/A'} | 52W Low: {info.get('52w_low') or 'N/A'}
+P/E: {info.get('pe_ratio') or 'N/A'} | Forward P/E: {info.get('forward_pe') or 'N/A'} | P/B: {info.get('pb_ratio') or 'N/A'}
+EPS (TTM): {info.get('eps') or 'N/A'} | Revenue: {m(info.get('revenue'))}
+Gross Margin: {pct(info.get('gross_margins'))} | Op Margin: {pct(info.get('operating_margins'))} | Net Margin: {pct(info.get('profit_margins'))}
+Debt/Equity: {info.get('debt_to_equity') or 'N/A'} | Free Cash Flow: {m(info.get('free_cashflow'))}
+Analyst Target: {info.get('target_mean_price') or 'N/A'} | Analyst Consensus: {(info.get('recommendation') or 'N/A').upper()}
+Short Ratio: {info.get('short_ratio') or 'N/A'} | Short % Float: {pct(info.get('short_percent_of_float'))}
 
 ═══════════════════════════════════════
 TECHNICAL INDICATORS (Citadel Framework)
@@ -75,7 +86,7 @@ Fibonacci Retracement Levels (last 50 bars):
   0.0 (Low): ${fib.get('0.0', 'N/A')}
 
 Volume:
-  Current Volume: {indicators.get('volume', 0):,} | 20-day Avg: {indicators.get('avg_volume_20', 0):,}
+  Current Volume: {(indicators.get('volume') or 0):,} | 20-day Avg: {(indicators.get('avg_volume_20') or 0):,}
   Volume Ratio: {f'{volume_ratio:.2f}x' if volume_ratio else 'N/A'} {"→ HIGH volume (confirms move)" if volume_ratio and volume_ratio > 1.5 else "→ Low volume (weak conviction)" if volume_ratio and volume_ratio < 0.7 else "→ Normal volume"}
 
 Recent Price History (last 10 bars):
@@ -230,8 +241,8 @@ def _fallback_analysis(ticker: str, indicators: dict, info: dict) -> dict:
             "weekly": "bullish" if price_above_sma50 else "bearish",
             "overall": "bullish" if price_above_sma200 else "bearish",
         },
-        "technical_summary": f"Rule-based analysis: RSI at {rsi:.1f}, MACD {'above' if macd and macd_signal and macd > macd_signal else 'below'} signal. Price is {'above' if price_above_sma200 else 'below'} SMA200.",
-        "fundamental_summary": f"P/E: {info.get('pe_ratio', 'N/A')}, Market Cap: ${info.get('market_cap', 0):,.0f}. Add GROQ_API_KEY for full AI analysis.",
+        "technical_summary": f"Rule-based analysis: RSI at {f'{rsi:.1f}' if rsi else 'N/A'}, MACD {'above' if macd and macd_signal and macd > macd_signal else 'below'} signal. Price is {'above' if price_above_sma200 else 'below'} SMA200.",
+        "fundamental_summary": f"P/E: {info.get('pe_ratio') or 'N/A'}, Market Cap: {('${:,.0f}'.format(info['market_cap'])) if info.get('market_cap') else 'N/A'}. Add GROQ_API_KEY for full AI analysis.",
         "risk_factors": ["No API key — analysis is rule-based only", "Verify with full Groq AI analysis"],
         "catalysts": ["Technical setup based on indicators"],
         "news_sentiment": "neutral",
