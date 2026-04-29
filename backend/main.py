@@ -9,7 +9,7 @@ from typing import Optional
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from stock_data import fetch_stock_info, fetch_ohlcv, fetch_ohlcv_for_chart, fetch_realtime_price, fetch_earnings_history
+from stock_data import fetch_stock_info, fetch_ohlcv, fetch_ohlcv_for_chart, fetch_realtime_price, fetch_earnings_history, search_symbols
 from indicators import compute_all_indicators
 from news import fetch_stock_news
 from ai_analyzer import analyze_stock
@@ -41,6 +41,16 @@ def run_sync(fn, *args, **kwargs):
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": "1.0.0"}
+
+
+@app.get("/api/search")
+async def symbol_search(q: str = Query(..., min_length=1)):
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(executor, search_symbols, q.strip(), 8)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/stock/{ticker}")
