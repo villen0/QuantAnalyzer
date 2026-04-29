@@ -79,7 +79,7 @@ export default function App() {
       } catch { /* ignore */ }
     };
     poll();
-    priceInterval.current = setInterval(poll, 8000);
+    priceInterval.current = setInterval(poll, 15000);
     return () => { if (priceInterval.current) clearInterval(priceInterval.current); };
   }, [ticker]);
 
