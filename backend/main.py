@@ -9,7 +9,7 @@ from typing import Optional
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from stock_data import fetch_stock_info, fetch_ohlcv, fetch_ohlcv_for_chart, fetch_realtime_price, fetch_earnings_history, warmup
+from stock_data import fetch_stock_info, fetch_ohlcv, fetch_ohlcv_for_chart, fetch_realtime_price, fetch_earnings_history
 from indicators import compute_all_indicators
 from news import fetch_stock_news
 from ai_analyzer import analyze_stock
@@ -21,8 +21,6 @@ app = FastAPI(title="QuantAnalyzer API", version="1.0.0")
 @app.on_event("startup")
 async def on_startup():
     init_db()
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, warmup)
 
 _origins_env = os.environ.get("ALLOW_ORIGINS", "*")
 _origins = ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",")]

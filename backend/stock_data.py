@@ -1,219 +1,136 @@
-import re
+import os
 import time
 import requests
 import pandas as pd
-from datetime import datetime, timezone
-from threading import Lock
+from datetime import datetime, timezone, timedelta
 
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json,text/plain,*/*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://finance.yahoo.com/",
+_BASE = "https://finnhub.io/api/v1"
+_HEADERS = {"User-Agent": "QuantAnalyzer/1.0"}
+
+_PERIOD_DAYS = {
+    "1mo": 30, "3mo": 90, "6mo": 180,
+    "1y": 365, "2y": 730, "5y": 1825,
 }
 
-_PERIOD_MAP = {
-    "1mo": "1mo", "3mo": "3mo", "6mo": "6mo",
-    "1y": "1y", "2y": "2y", "5y": "5y",
-}
 
-_session = requests.Session()
-_session.headers.update(_HEADERS)
-_crumb: str | None = None
-_crumb_lock = Lock()
-
-
-def _fetch_crumb() -> str:
-    """Fetch Yahoo Finance crumb with retry on 429 and HTML fallback."""
-    # Warm up session cookies
-    _session.get("https://finance.yahoo.com/", timeout=12)
-
-    # Try both hosts; retry up to 3 times with backoff on 429
-    for host in ("query1", "query2"):
-        for attempt in range(3):
-            try:
-                if attempt:
-                    time.sleep(2 ** attempt)  # 2s, 4s
-                r = _session.get(
-                    f"https://{host}.finance.yahoo.com/v1/test/getcrumb",
-                    timeout=12,
-                )
-                if r.status_code == 429:
-                    continue
-                r.raise_for_status()
-                crumb = r.text.strip()
-                if crumb and len(crumb) > 3:
-                    return crumb
-            except Exception:
-                pass
-
-    # Last resort: extract crumb embedded in Yahoo Finance page HTML
-    for page_url in (
-        "https://finance.yahoo.com/quote/AAPL/",
-        "https://finance.yahoo.com/",
-    ):
-        try:
-            r = _session.get(page_url, timeout=15)
-            m = re.search(r'"crumb"\s*:\s*"([^"]{5,20})"', r.text)
-            if m:
-                return m.group(1)
-        except Exception:
-            pass
-
-    raise RuntimeError(
-        "Yahoo Finance is temporarily rate-limiting this server. "
-        "Please wait a few seconds and try again."
-    )
+def _key() -> str:
+    k = os.environ.get("FINNHUB_API_KEY", "")
+    if not k:
+        raise RuntimeError(
+            "FINNHUB_API_KEY is not set. "
+            "Get a free key at finnhub.io and add it to your Render environment."
+        )
+    return k
 
 
-def _ensure_crumb() -> str:
-    global _crumb
-    with _crumb_lock:
-        if _crumb:
-            return _crumb
-        _crumb = _fetch_crumb()
-        return _crumb
-
-
-def warmup():
-    """Call once at server startup to pre-fetch the crumb before requests arrive."""
-    _ensure_crumb()
-
-
-def _reset_crumb():
-    global _crumb
-    with _crumb_lock:
-        _crumb = None
-
-
-def _get(url: str, params: dict) -> requests.Response:
-    params["crumb"] = _ensure_crumb()
-    r = _session.get(url, params=params, timeout=15)
-    if r.status_code in (401, 403):
-        _reset_crumb()
-        params["crumb"] = _ensure_crumb()
-        r = _session.get(url, params=params, timeout=15)
-    if r.status_code == 429:
-        time.sleep(3)
-        r = _session.get(url, params=params, timeout=15)
-    r.raise_for_status()
-    return r
-
-
-def _chart(ticker: str, period: str = "3mo", interval: str = "1d") -> dict:
-    r = _get(
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
-        {"range": _PERIOD_MAP.get(period, "3mo"), "interval": interval,
-         "includePrePost": "false", "events": "div,splits"},
-    )
-    result = r.json()["chart"]["result"]
-    if not result:
-        raise ValueError(f"No chart data for {ticker}")
-    return result[0]
-
-
-def _quote(ticker: str) -> dict:
-    r = _get(
-        "https://query1.finance.yahoo.com/v7/finance/quote",
-        {"symbols": ticker},
-    )
-    result = r.json().get("quoteResponse", {}).get("result", [])
-    if not result:
-        raise ValueError(f"No quote for {ticker}")
-    return result[0]
-
-
-def _summary(ticker: str, modules: str) -> dict:
-    r = _get(
-        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}",
-        {"modules": modules},
-    )
-    result = r.json().get("quoteSummary", {}).get("result")
-    if not result:
-        raise ValueError(f"No summary data for {ticker}")
-    return result[0]
-
-
-def _raw(d: dict, key: str):
-    val = d.get(key)
-    if isinstance(val, dict):
-        return val.get("raw")
-    return val
+def _get(path: str, **params) -> any:
+    params["token"] = _key()
+    for attempt in range(3):
+        r = requests.get(f"{_BASE}{path}", params=params, headers=_HEADERS, timeout=15)
+        if r.status_code == 429:
+            time.sleep(2 ** attempt)
+            continue
+        r.raise_for_status()
+        return r.json()
+    raise RuntimeError("Finnhub rate limit exceeded — please try again in a moment.")
 
 
 def fetch_stock_info(ticker: str) -> dict:
-    q = _quote(ticker)
-    s = _summary(ticker, "summaryDetail,financialData,defaultKeyStatistics,assetProfile")
-    sd = s.get("summaryDetail", {})
-    fd = s.get("financialData", {})
-    ks = s.get("defaultKeyStatistics", {})
-    ap = s.get("assetProfile", {})
+    profile  = _get("/stock/profile2", symbol=ticker)
+    if not profile or not profile.get("name"):
+        raise ValueError(f"Unknown ticker '{ticker}'. Check the symbol and try again.")
+
+    metrics  = _get("/stock/metric", symbol=ticker, metric="all").get("metric", {})
+    quote    = _get("/quote", symbol=ticker)
+
+    try:
+        targets = _get("/stock/price-target", symbol=ticker)
+        target_price = targets.get("targetMean")
+    except Exception:
+        target_price = None
+
+    try:
+        recs = _get("/stock/recommendation", symbol=ticker)
+        rec = recs[0] if recs else {}
+        total = sum(rec.get(k, 0) for k in ("buy", "strongBuy", "hold", "sell", "strongSell"))
+        buy_pct = (rec.get("buy", 0) + rec.get("strongBuy", 0)) / total if total else 0
+        recommendation = "buy" if buy_pct > 0.6 else "sell" if buy_pct < 0.35 else "hold"
+    except Exception:
+        recommendation = "N/A"
+
+    shares = profile.get("shareOutstanding") or 0  # millions
+    cap_m  = profile.get("marketCapitalization") or 0  # millions
+
+    def pct(v):
+        return v / 100 if v is not None else None
 
     return {
-        "ticker": ticker.upper(),
-        "name": q.get("longName") or q.get("shortName") or ticker.upper(),
-        "sector": ap.get("sector", "N/A"),
-        "industry": ap.get("industry", "N/A"),
-        "market_cap": q.get("marketCap"),
-        "pe_ratio": q.get("trailingPE") or _raw(sd, "trailingPE"),
-        "forward_pe": q.get("forwardPE") or _raw(sd, "forwardPE"),
-        "pb_ratio": _raw(ks, "priceToBook"),
-        "ps_ratio": _raw(sd, "priceToSalesTrailing12Months"),
-        "dividend_yield": q.get("dividendYield") or _raw(sd, "dividendYield"),
-        "beta": q.get("beta") or _raw(sd, "beta"),
-        "52w_high": q.get("fiftyTwoWeekHigh"),
-        "52w_low": q.get("fiftyTwoWeekLow"),
-        "avg_volume": q.get("averageDailyVolume3Month") or q.get("averageDailyVolume10Day"),
-        "eps": q.get("epsTrailingTwelveMonths") or _raw(ks, "trailingEps"),
-        "forward_eps": q.get("epsForward") or _raw(ks, "forwardEps"),
-        "revenue": _raw(fd, "totalRevenue"),
-        "gross_margins": _raw(fd, "grossMargins"),
-        "operating_margins": _raw(fd, "operatingMargins"),
-        "profit_margins": _raw(fd, "profitMargins"),
-        "debt_to_equity": _raw(fd, "debtToEquity"),
-        "free_cashflow": _raw(fd, "freeCashflow"),
-        "current_price": q.get("regularMarketPrice"),
-        "target_mean_price": _raw(fd, "targetMeanPrice"),
-        "recommendation": _raw(fd, "recommendationKey") or "N/A",
-        "num_analyst_opinions": _raw(fd, "numberOfAnalystOpinions"),
-        "short_ratio": _raw(ks, "shortRatio"),
-        "short_percent_of_float": _raw(ks, "shortPercentOfFloat"),
-        "description": ap.get("longBusinessSummary", ""),
-        "website": ap.get("website", ""),
-        "country": ap.get("country", ""),
-        "employees": ap.get("fullTimeEmployees"),
-        "_source": "live",
+        "ticker":                  ticker.upper(),
+        "name":                    profile.get("name", ticker.upper()),
+        "sector":                  profile.get("finnhubIndustry", "N/A"),
+        "industry":                profile.get("finnhubIndustry", "N/A"),
+        "market_cap":              cap_m * 1e6 if cap_m else None,
+        "pe_ratio":                metrics.get("peTTM") or metrics.get("peAnnual"),
+        "forward_pe":              metrics.get("forwardPE"),
+        "pb_ratio":                metrics.get("pbAnnual"),
+        "ps_ratio":                metrics.get("psTTM") or metrics.get("psAnnual"),
+        "dividend_yield":          metrics.get("dividendYieldIndicatedAnnual"),
+        "beta":                    metrics.get("beta"),
+        "52w_high":                metrics.get("52WeekHigh"),
+        "52w_low":                 metrics.get("52WeekLow"),
+        "avg_volume":              int(metrics["10DayAverageTradingVolume"] * 1e6) if metrics.get("10DayAverageTradingVolume") else None,
+        "eps":                     metrics.get("epsTTM") or metrics.get("epsAnnual"),
+        "forward_eps":             None,
+        "revenue":                 (metrics["revenuePerShareTTM"] * shares * 1e6) if metrics.get("revenuePerShareTTM") and shares else None,
+        "gross_margins":           pct(metrics.get("grossMarginTTM") or metrics.get("grossMarginAnnual")),
+        "operating_margins":       pct(metrics.get("operatingMarginTTM") or metrics.get("operatingMarginAnnual")),
+        "profit_margins":          pct(metrics.get("netProfitMarginTTM") or metrics.get("netProfitMarginAnnual")),
+        "debt_to_equity":          metrics.get("totalDebt/totalEquityAnnual"),
+        "free_cashflow":           (metrics["freeCashFlowPerShareAnnual"] * shares * 1e6) if metrics.get("freeCashFlowPerShareAnnual") and shares else None,
+        "current_price":           quote.get("c"),
+        "target_mean_price":       target_price,
+        "recommendation":          recommendation,
+        "num_analyst_opinions":    None,
+        "short_ratio":             metrics.get("shortInterestRatio"),
+        "short_percent_of_float":  None,
+        "description":             "",
+        "website":                 profile.get("weburl", ""),
+        "country":                 profile.get("country", ""),
+        "employees":               None,
+        "_source":                 "live",
     }
 
 
-def _parse_chart(res: dict) -> list[dict]:
-    timestamps = res.get("timestamp", [])
-    quote = res["indicators"]["quote"][0]
-    opens = quote.get("open") or []
-    highs = quote.get("high") or []
-    lows = quote.get("low") or []
-    closes = quote.get("close") or []
-    volumes = quote.get("volume") or []
+def _candles(ticker: str, period: str) -> dict:
+    days = _PERIOD_DAYS.get(period, 90)
+    now  = datetime.now(timezone.utc)
+    data = _get(
+        "/stock/candle",
+        symbol=ticker,
+        resolution="D",
+        **{"from": int((now - timedelta(days=days)).timestamp()), "to": int(now.timestamp())},
+    )
+    if data.get("s") != "ok":
+        raise ValueError(f"No candle data for {ticker}")
+    return data
 
+
+def _parse_candles(data: dict) -> list[dict]:
     records = []
-    for i, ts in enumerate(timestamps):
-        c = closes[i] if i < len(closes) else None
-        if c is None:
-            continue
+    for i, ts in enumerate(data.get("t", [])):
         records.append({
-            "date": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
-            "open": round(float(opens[i] if i < len(opens) and opens[i] is not None else c), 4),
-            "high": round(float(highs[i] if i < len(highs) and highs[i] is not None else c), 4),
-            "low": round(float(lows[i] if i < len(lows) and lows[i] is not None else c), 4),
-            "close": round(float(c), 4),
-            "volume": int(volumes[i]) if i < len(volumes) and volumes[i] is not None else 0,
+            "date":   datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            "open":   round(float(data["o"][i]), 4),
+            "high":   round(float(data["h"][i]), 4),
+            "low":    round(float(data["l"][i]), 4),
+            "close":  round(float(data["c"][i]), 4),
+            "volume": int(data["v"][i]),
         })
     return records
 
 
 def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
-    res = _chart(ticker, period, interval)
-    bars = _parse_chart(res)
+    bars = _parse_candles(_candles(ticker, period))
     if not bars:
         raise ValueError(f"Empty OHLCV for {ticker}")
     df = pd.DataFrame([{
@@ -226,43 +143,40 @@ def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.Da
 
 
 def fetch_ohlcv_for_chart(ticker: str, period: str = "3mo", interval: str = "1d") -> list:
-    res = _chart(ticker, period, interval)
-    bars = _parse_chart(res)
+    bars = _parse_candles(_candles(ticker, period))
     if not bars:
         raise ValueError(f"Empty chart data for {ticker}")
     return bars
 
 
 def fetch_realtime_price(ticker: str) -> dict:
-    q = _quote(ticker)
-    price = q.get("regularMarketPrice")
+    q = _get("/quote", symbol=ticker)
+    price = q.get("c")
     if not price:
         raise ValueError(f"No price for {ticker}")
-    prev_close = q.get("regularMarketPreviousClose") or price
     return {
-        "ticker": ticker.upper(),
-        "price": round(float(price), 2),
-        "prev_close": round(float(prev_close), 2) if prev_close else None,
-        "change": round(float(q.get("regularMarketChange", 0.0)), 2),
-        "change_pct": round(float(q.get("regularMarketChangePercent", 0.0)), 2),
-        "volume": q.get("regularMarketVolume"),
-        "timestamp": datetime.utcnow().isoformat(),
-        "_source": "live",
+        "ticker":     ticker.upper(),
+        "price":      round(float(price), 2),
+        "prev_close": round(float(q.get("pc") or price), 2),
+        "change":     round(float(q.get("d") or 0), 2),
+        "change_pct": round(float(q.get("dp") or 0), 2),
+        "volume":     None,
+        "timestamp":  datetime.utcnow().isoformat(),
+        "_source":    "live",
     }
 
 
 def fetch_earnings_history(ticker: str) -> list:
     try:
-        s = _summary(ticker, "earningsHistory")
-        history = s.get("earningsHistory", {}).get("history", [])
+        data = _get("/stock/earnings", symbol=ticker)
         return [
             {
-                "quarter": item.get("period", ""),
-                "actual": _raw(item, "epsActual"),
-                "estimate": _raw(item, "epsEstimate"),
-                "surprise_pct": _raw(item, "surprisePercent"),
+                "quarter":      f"{item.get('year', '')} Q{item.get('quarter', '')}",
+                "actual":       item.get("actual"),
+                "estimate":     item.get("estimate"),
+                "surprise_pct": item.get("surprisePercent"),
             }
-            for item in history[:4]
+            for item in (data or [])[:4]
         ]
     except Exception:
         return []
