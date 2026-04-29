@@ -42,6 +42,32 @@ export interface StockInfo {
   website: string;
 }
 
+export interface SMCOrderBlock {
+  high: number;
+  low: number;
+  mitigated: boolean;
+}
+
+export interface SMCFairValueGap {
+  type: 'bullish' | 'bearish';
+  top: number;
+  bottom: number;
+  size: number;
+  mitigated: boolean;
+}
+
+export interface SMCData {
+  market_structure: 'bullish' | 'bearish' | 'ranging';
+  bos: { direction: string; level: number } | null;
+  choch: { direction: string; level: number; description: string } | null;
+  order_blocks: { bullish: SMCOrderBlock[]; bearish: SMCOrderBlock[] };
+  fair_value_gaps: SMCFairValueGap[];
+  liquidity: { sell_side: number[]; buy_side: number[] };
+  premium_discount: { zone: 'premium' | 'discount' | 'equilibrium'; equilibrium: number; range_high: number; range_low: number };
+  swing_highs: number[];
+  swing_lows: number[];
+}
+
 export interface Indicators {
   current_price: number;
   rsi: number | null;
@@ -70,6 +96,7 @@ export interface Indicators {
   golden_cross_50_200: boolean;
   death_cross_50_200: boolean;
   fibonacci: Record<string, number>;
+  smc?: SMCData;
   support_resistance: {
     support: number;
     resistance: number;

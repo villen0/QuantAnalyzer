@@ -7,6 +7,7 @@ import IndicatorPanel from './components/IndicatorPanel';
 import NewsPanel from './components/NewsPanel';
 import TradeLog from './components/TradeLog';
 import FundamentalsPanel from './components/FundamentalsPanel';
+import SMCPanel from './components/SMCPanel';
 import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade } from './api/client';
 import type { DashboardData, AIAnalysis, Trade } from './types';
 
@@ -186,6 +187,9 @@ export default function App() {
                     <IndicatorPanel indicators={data.indicators} chartData={data.chart} />
                     <NewsPanel news={data.news} />
                   </div>
+                  {data.indicators.smc && (
+                    <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
+                  )}
                 </div>
 
                 {/* Right column — AI */}
@@ -205,6 +209,9 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <PriceChart data={data.chart} indicators={data.indicators} period={period} onPeriodChange={handlePeriodChange} />
                   <IndicatorPanel indicators={data.indicators} chartData={data.chart} />
+                  {data.indicators.smc && (
+                    <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
+                  )}
                 </div>
                 <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
               </div>
