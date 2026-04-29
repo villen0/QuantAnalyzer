@@ -126,19 +126,55 @@ def _candles_finnhub(ticker: str, period: str) -> list[dict]:
     return records
 
 
-def _candles_stooq(ticker: str, period: str) -> list[dict]:
-    """Free OHLCV fallback via Stooq — no API key required."""
-    days     = _PERIOD_DAYS.get(period, 90)
-    today    = datetime.now(timezone.utc).date()
-    from_d   = (today - timedelta(days=days)).strftime("%Y%m%d")
-    to_d     = today.strftime("%Y%m%d")
+def _candles_alphavantage(ticker: str, period: str) -> list[dict]:
+    """OHLCV via Alpha Vantage — free, reliable, no IP blocking. Needs ALPHA_VANTAGE_KEY."""
+    av_key = os.environ.get("ALPHA_VANTAGE_KEY", "")
+    if not av_key:
+        return []
+    days = _PERIOD_DAYS.get(period, 90)
+    output = "compact" if days <= 100 else "full"
+    r = requests.get(
+        "https://www.alphavantage.co/query",
+        params={"function": "TIME_SERIES_DAILY", "symbol": ticker,
+                "outputsize": output, "apikey": av_key},
+        headers={"User-Agent": "QuantAnalyzer/1.0"},
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json()
+    series = data.get("Time Series (Daily)", {})
+    if not series:
+        return []
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date()
+    records = []
+    for date_str, vals in series.items():
+        if datetime.strptime(date_str, "%Y-%m-%d").date() < cutoff:
+            continue
+        records.append({
+            "date":   f"{date_str} 00:00",
+            "open":   round(float(vals["1. open"]), 4),
+            "high":   round(float(vals["2. high"]), 4),
+            "low":    round(float(vals["3. low"]), 4),
+            "close":  round(float(vals["4. close"]), 4),
+            "volume": int(vals["5. volume"]),
+        })
+    records.sort(key=lambda x: x["date"])
+    return records
 
-    # Stooq uses lowercase ticker with .us suffix for US equities
+
+def _candles_stooq(ticker: str, period: str) -> list[dict]:
+    """OHLCV fallback via Stooq — no API key required."""
+    days  = _PERIOD_DAYS.get(period, 90)
+    today = datetime.now(timezone.utc).date()
+    from_d = (today - timedelta(days=days)).strftime("%Y%m%d")
+    to_d   = today.strftime("%Y%m%d")
     for symbol in (f"{ticker.lower()}.us", ticker.lower()):
         try:
             url = f"https://stooq.com/q/d/l/?s={symbol}&d1={from_d}&d2={to_d}&i=d"
             r = requests.get(url, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
             r.raise_for_status()
+            if "<html" in r.text[:100].lower():
+                continue  # got an error page, not CSV
             lines = [l for l in r.text.strip().splitlines() if l and not l.startswith("Date")]
             if not lines:
                 continue
@@ -158,7 +194,6 @@ def _candles_stooq(ticker: str, period: str) -> list[dict]:
                     "volume": int(float(vol)) if vol else 0,
                 })
             if records:
-                # Stooq returns newest-first; reverse to chronological order
                 records.sort(key=lambda x: x["date"])
                 return records
         except Exception:
@@ -167,22 +202,32 @@ def _candles_stooq(ticker: str, period: str) -> list[dict]:
 
 
 def _fetch_bars(ticker: str, period: str) -> list[dict]:
-    """Try Finnhub candles, fall back to Stooq on 403/permission error."""
+    """Waterfall: Finnhub (premium) → Alpha Vantage (free key) → Stooq (free/no key)."""
+    # 1. Finnhub candles (premium users)
     try:
         bars = _candles_finnhub(ticker, period)
         if bars:
             return bars
     except Exception as e:
-        if "403" not in str(e) and "Forbidden" not in str(e) and "No candle" not in str(e):
-            raise  # re-raise non-permission errors (network, bad ticker, etc.)
+        err = str(e)
+        if "403" not in err and "Forbidden" not in err and "No candle" not in err:
+            raise
 
+    # 2. Alpha Vantage (free, reliable — set ALPHA_VANTAGE_KEY in Render env)
+    bars = _candles_alphavantage(ticker, period)
+    if bars:
+        return bars
+
+    # 3. Stooq (free, no key, US stocks)
     bars = _candles_stooq(ticker, period)
-    if not bars:
-        raise ValueError(
-            f"Could not fetch price history for {ticker}. "
-            "Check the ticker symbol and try again."
-        )
-    return bars
+    if bars:
+        return bars
+
+    raise ValueError(
+        f"Could not load price history for '{ticker}'. "
+        "Set ALPHA_VANTAGE_KEY in your Render environment for reliable data "
+        "(free at alphavantage.co)."
+    )
 
 
 def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
