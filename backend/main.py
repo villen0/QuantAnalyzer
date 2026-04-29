@@ -13,6 +13,7 @@ from stock_data import fetch_stock_info, fetch_ohlcv, fetch_ohlcv_for_chart, fet
 from indicators import compute_all_indicators
 from news import fetch_stock_news
 from ai_analyzer import analyze_stock
+from smc_analyzer import analyze_smc
 from trade_logger import log_trade, log_analysis, get_trades, get_analysis_log, delete_trade, init_db
 
 app = FastAPI(title="QuantAnalyzer API", version="1.0.0")
@@ -132,6 +133,23 @@ async def analyze(ticker: str, api_key: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/smc-analysis/{ticker}")
+async def get_smc_analysis(ticker: str):
+    """Rule-based SMC trade setup: entry, stop loss, and targets derived from SMC indicators."""
+    ticker = ticker.upper().strip()
+    try:
+        loop = asyncio.get_event_loop()
+        df = await loop.run_in_executor(executor, fetch_ohlcv, ticker, "6mo", "1d")
+        indicators = compute_all_indicators(df)
+        smc          = indicators.get("smc") or {}
+        atr          = indicators.get("atr") or 0
+        current_price = indicators.get("current_price") or 0
+        result = analyze_smc(ticker, smc, current_price, atr)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/full/{ticker}")
 async def get_full_dashboard(ticker: str, period: str = Query("3mo")):
     """Fetch all data in one shot for initial dashboard load."""
@@ -146,13 +164,20 @@ async def get_full_dashboard(ticker: str, period: str = Query("3mo")):
         df = await loop.run_in_executor(executor, fetch_ohlcv, ticker, "6mo", "1d")
         indicators = compute_all_indicators(df)
         earnings = await loop.run_in_executor(executor, fetch_earnings_history, ticker)
+        smc_analysis = analyze_smc(
+            ticker,
+            indicators.get("smc") or {},
+            indicators.get("current_price") or 0,
+            indicators.get("atr") or 0,
+        )
         return {
-            "ticker": ticker,
-            "info": info,
-            "chart": chart,
-            "indicators": indicators,
-            "news": news,
-            "earnings": earnings,
+            "ticker":       ticker,
+            "info":         info,
+            "chart":        chart,
+            "indicators":   indicators,
+            "news":         news,
+            "earnings":     earnings,
+            "smc_analysis": smc_analysis,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

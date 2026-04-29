@@ -8,8 +8,9 @@ import NewsPanel from './components/NewsPanel';
 import TradeLog from './components/TradeLog';
 import FundamentalsPanel from './components/FundamentalsPanel';
 import SMCPanel from './components/SMCPanel';
+import SMCAnalysisPanel from './components/SMCAnalysisPanel';
 import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade } from './api/client';
-import type { DashboardData, AIAnalysis, Trade } from './types';
+import type { DashboardData, AIAnalysis, Trade, SMCAnalysis } from './types';
 
 type Tab = 'overview' | 'indicators' | 'fundamentals' | 'news' | 'trades';
 
@@ -27,6 +28,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('overview');
   const [data, setData] = useState<DashboardData | null>(null);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
+  const [smcAnalysis, setSmcAnalysis] = useState<SMCAnalysis | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -40,10 +42,12 @@ export default function App() {
     setLoading(true);
     setError(null);
     setAnalysis(null);
+    setSmcAnalysis(null);
     setLivePrice(null);
     try {
       const d = await fetchDashboard(t, p);
       setData(d);
+      if (d.smc_analysis) setSmcAnalysis(d.smc_analysis);
       if (d.info?.current_price) {
         setLivePrice(d.info.current_price);
       }
@@ -192,8 +196,9 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Right column — AI */}
-                <div>
+                {/* Right column — SMC analysis + AI */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} />
                   <AIDecision
                     analysis={analysis}
                     onAnalyze={handleAnalyze}
@@ -213,7 +218,10 @@ export default function App() {
                     <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
                   )}
                 </div>
-                <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} />
+                  <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
+                </div>
               </div>
             )}
 

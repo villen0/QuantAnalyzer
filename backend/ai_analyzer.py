@@ -5,110 +5,50 @@ from typing import Optional
 
 
 def build_analysis_prompt(ticker: str, info: dict, indicators: dict, news: list, chart_data: list) -> str:
-    # Safe formatters for potentially-None info values
-    def n(v, decimals=2):
-        return f"{v:.{decimals}f}" if v is not None else "N/A"
     def m(v):
         if v is None: return "N/A"
         if abs(v) >= 1e12: return f"${v/1e12:.2f}T"
         if abs(v) >= 1e9:  return f"${v/1e9:.2f}B"
         if abs(v) >= 1e6:  return f"${v/1e6:.2f}M"
         return f"${v:,.0f}"
+
     def pct(v):
         return f"{(v or 0)*100:.1f}%" if v is not None else "N/A"
+
     recent_prices = chart_data[-10:] if len(chart_data) >= 10 else chart_data
     price_summary = ", ".join([f"{d['date'][:10]}: ${d['close']}" for d in recent_prices])
 
     news_summary = ""
     if news:
-        for n in news[:8]:
-            news_summary += f"  - [{n['sentiment'].upper()}] {n['title']} ({n['source']}, {n['published'][:10]})\n"
+        for item in news[:8]:
+            news_summary += f"  - [{item['sentiment'].upper()}] {item['title']} ({item['source']}, {item['published'][:10]})\n"
     else:
         news_summary = "  No recent news available.\n"
 
-    sr = indicators.get("support_resistance", {})
-    fib = indicators.get("fibonacci", {})
-    rsi = indicators.get("rsi")
-    macd = indicators.get("macd")
-    macd_signal = indicators.get("macd_signal")
-    macd_hist = indicators.get("macd_histogram")
-    stoch_k = indicators.get("stoch_k")
-    bb_pos = indicators.get("bb_position")
-    volume_ratio = indicators.get("volume_ratio")
-    atr = indicators.get("atr")
+    sr            = indicators.get("support_resistance", {})
+    fib           = indicators.get("fibonacci", {})
+    volume_ratio  = indicators.get("volume_ratio")
+    atr           = indicators.get("atr")
     current_price = indicators.get("current_price")
-    smc = indicators.get("smc", {})
 
-    # Build SMC section text
-    smc_ms   = smc.get("market_structure", "N/A").upper()
-    smc_bos  = smc.get("bos")
-    smc_choch = smc.get("choch")
-    smc_pd   = smc.get("premium_discount", {})
-    smc_fvgs = smc.get("fair_value_gaps", [])
-    smc_obs  = smc.get("order_blocks", {})
-    smc_liq  = smc.get("liquidity", {})
-
-    def _ob_line(ob):
-        status = "mitigated" if ob.get("mitigated") else "active"
-        return f"${ob['low']}-${ob['high']} [{status}]"
-
-    bullish_ob_str = ", ".join(_ob_line(o) for o in smc_obs.get("bullish", [])) or "None detected"
-    bearish_ob_str = ", ".join(_ob_line(o) for o in smc_obs.get("bearish", [])) or "None detected"
-    fvg_str = ""
-    for fvg in smc_fvgs[:3]:
-        tag = "mitigated" if fvg.get("mitigated") else "open"
-        fvg_str += f"  {'▲' if fvg['type'] == 'bullish' else '▼'} {fvg['type'].upper()} FVG: ${fvg['bottom']}-${fvg['top']} (size ${fvg['size']}) [{tag}]\n"
-    if not fvg_str:
-        fvg_str = "  None detected\n"
-
-    smc_section = f"""
-═══════════════════════════════════════
-SMART MONEY CONCEPTS (SMC)
-═══════════════════════════════════════
-Market Structure: {smc_ms}
-{"BOS: " + ("BULLISH Break of Structure above $" + str(smc_bos['level'])) if smc_bos and smc_bos['direction'] == 'bullish' else "BOS: BEARISH Break of Structure below $" + str(smc_bos['level']) if smc_bos else "BOS: No active break"}
-{"CHoCH: " + smc_choch['description'] + " at $" + str(smc_choch['level']) if smc_choch else "CHoCH: None"}
-
-Premium / Discount Zone: {smc_pd.get('zone', 'N/A').upper()}
-  Equilibrium (50%): ${smc_pd.get('equilibrium', 'N/A')} | Range: ${smc_pd.get('range_low', 'N/A')} - ${smc_pd.get('range_high', 'N/A')}
-  {"→ Price in PREMIUM zone (above EQ) — favors shorts / caution for longs" if smc_pd.get('zone') == 'premium' else "→ Price in DISCOUNT zone (below EQ) — favors longs / caution for shorts" if smc_pd.get('zone') == 'discount' else "→ Price at EQUILIBRIUM — neutral zone"}
-
-Order Blocks:
-  Bullish OB(s): {bullish_ob_str}
-  Bearish OB(s): {bearish_ob_str}
-
-Fair Value Gaps (FVGs):
-{fvg_str}
-Liquidity Pools:
-  Sell-side (above price): {", ".join(f"${l}" for l in smc_liq.get("sell_side", [])) or "None identified"}
-  Buy-side (below price):  {", ".join(f"${l}" for l in smc_liq.get("buy_side", [])) or "None identified"}
-"""
-
-    prompt = f"""You are a senior quantitative trader at Citadel who combines elite technical analysis with multi-framework institutional investment research to make precise BUY / SELL / HOLD calls.
-
-Analyze {ticker} ({info.get('name', ticker)}) and produce a comprehensive trading decision.
+    prompt = f"""You are a senior quantitative analyst. Analyze {ticker} ({info.get('name', ticker)}) using fundamentals and price action to deliver a precise BUY / SELL / HOLD recommendation.
 
 ═══════════════════════════════════════
-COMPANY OVERVIEW
+COMPANY & FUNDAMENTALS
 ═══════════════════════════════════════
 Sector: {info.get('sector', 'N/A')} | Industry: {info.get('industry', 'N/A')}
 Market Cap: {m(info.get('market_cap'))} | Beta: {info.get('beta') or 'N/A'}
 Current Price: ${current_price} | 52W High: {info.get('52w_high') or 'N/A'} | 52W Low: {info.get('52w_low') or 'N/A'}
-P/E: {info.get('pe_ratio') or 'N/A'} | Forward P/E: {info.get('forward_pe') or 'N/A'} | P/B: {info.get('pb_ratio') or 'N/A'}
+P/E (TTM): {info.get('pe_ratio') or 'N/A'} | P/B: {info.get('pb_ratio') or 'N/A'} | P/S: {info.get('ps_ratio') or 'N/A'}
 EPS (TTM): {info.get('eps') or 'N/A'} | Revenue: {m(info.get('revenue'))}
 Gross Margin: {pct(info.get('gross_margins'))} | Op Margin: {pct(info.get('operating_margins'))} | Net Margin: {pct(info.get('profit_margins'))}
 Debt/Equity: {info.get('debt_to_equity') or 'N/A'} | Free Cash Flow: {m(info.get('free_cashflow'))}
-Analyst Target: {info.get('target_mean_price') or 'N/A'} | Analyst Consensus: {(info.get('recommendation') or 'N/A').upper()}
-Short Ratio: {info.get('short_ratio') or 'N/A'} | Short % Float: {pct(info.get('short_percent_of_float'))}
+Dividend Yield: {pct(info.get('dividend_yield')) if info.get('dividend_yield') else 'N/A'}
 
 ═══════════════════════════════════════
-TECHNICAL INDICATORS (Citadel Framework)
+TREND & PRICE ACTION
 ═══════════════════════════════════════
-RSI(14): {rsi} {"→ OVERSOLD (<30)" if rsi and rsi < 30 else "→ OVERBOUGHT (>70)" if rsi and rsi > 70 else "→ Neutral zone"}
-MACD Line: {macd} | Signal: {macd_signal} | Histogram: {macd_hist} {"→ BULLISH crossover" if macd and macd_signal and macd > macd_signal else "→ BEARISH crossover" if macd and macd_signal and macd < macd_signal else ""}
-Stochastic K: {stoch_k} {"→ Oversold" if stoch_k and stoch_k < 20 else "→ Overbought" if stoch_k and stoch_k > 80 else ""}
-BB Position: {f'{bb_pos:.2%}' if bb_pos else 'N/A'} (0=lower band, 1=upper band, 0.5=midband)
-ATR(14): {atr} (volatility measure)
+ATR(14): {atr} (volatility / position sizing)
 
 Moving Averages:
   EMA9: ${indicators.get('ema9', 'N/A')} | EMA21: ${indicators.get('ema21', 'N/A')}
@@ -125,30 +65,24 @@ Support & Resistance (Pivot Points):
   Support 1: ${sr.get('s1', 'N/A')} | Support 2: ${sr.get('s2', 'N/A')}
   Range Support: ${sr.get('support', 'N/A')} | Range Resistance: ${sr.get('resistance', 'N/A')}
 
-Fibonacci Retracement Levels (last 50 bars):
-  1.0 (High): ${fib.get('1.0', 'N/A')} | 0.786: ${fib.get('0.786', 'N/A')}
-  0.618 (Golden): ${fib.get('0.618', 'N/A')} | 0.5: ${fib.get('0.5', 'N/A')}
-  0.382: ${fib.get('0.382', 'N/A')} | 0.236: ${fib.get('0.236', 'N/A')}
-  0.0 (Low): ${fib.get('0.0', 'N/A')}
+Fibonacci Retracement (last 50 bars):
+  High: ${fib.get('1.0', 'N/A')} | 0.786: ${fib.get('0.786', 'N/A')} | 0.618: ${fib.get('0.618', 'N/A')}
+  0.5: ${fib.get('0.5', 'N/A')} | 0.382: ${fib.get('0.382', 'N/A')} | Low: ${fib.get('0.0', 'N/A')}
 
 Volume:
-  Current Volume: {(indicators.get('volume') or 0):,} | 20-day Avg: {(indicators.get('avg_volume_20') or 0):,}
-  Volume Ratio: {f'{volume_ratio:.2f}x' if volume_ratio else 'N/A'} {"→ HIGH volume (confirms move)" if volume_ratio and volume_ratio > 1.5 else "→ Low volume (weak conviction)" if volume_ratio and volume_ratio < 0.7 else "→ Normal volume"}
+  Current: {(indicators.get('volume') or 0):,} | 20d Avg: {(indicators.get('avg_volume_20') or 0):,}
+  Ratio: {f'{volume_ratio:.2f}x' if volume_ratio else 'N/A'} {"→ HIGH volume (confirms move)" if volume_ratio and volume_ratio > 1.5 else "→ Low volume (weak)" if volume_ratio and volume_ratio < 0.7 else "→ Normal volume"}
 
-Recent Price History (last 10 bars):
+Recent Prices (last 10 bars):
 {price_summary}
-{smc_section}
+
 ═══════════════════════════════════════
-NEWS SENTIMENT (Renaissance Tech Framework)
+NEWS SENTIMENT
 ═══════════════════════════════════════
-Recent Headlines:
 {news_summary}
-
 ═══════════════════════════════════════
-REQUIRED ANALYSIS OUTPUT
+REQUIRED OUTPUT (strict JSON only)
 ═══════════════════════════════════════
-Provide your analysis in the following exact JSON structure:
-
 {{
   "decision": "STRONG BUY" | "BUY" | "HOLD" | "SELL" | "STRONG SELL",
   "confidence": <integer 0-100>,
@@ -162,19 +96,19 @@ Provide your analysis in the following exact JSON structure:
     "weekly": "bullish" | "bearish" | "neutral",
     "overall": "bullish" | "bearish" | "neutral"
   }},
-  "technical_summary": "<2-3 sentence plain-English summary of all technical signals>",
-  "fundamental_summary": "<2-3 sentence plain-English summary of valuation and fundamentals>",
+  "technical_summary": "<2-3 sentences on price action, trend, and key levels>",
+  "fundamental_summary": "<2-3 sentences on valuation and financial health>",
   "risk_factors": ["<risk 1>", "<risk 2>", "<risk 3>"],
   "catalysts": ["<catalyst 1>", "<catalyst 2>"],
   "news_sentiment": "bullish" | "bearish" | "neutral" | "mixed",
   "key_levels": {{
-    "must_hold": <float - key support level>,
-    "breakout_target": <float - key resistance to break>
+    "must_hold": <float>,
+    "breakout_target": <float>
   }},
-  "reasoning": "<3-5 sentences explaining the overall decision with specific reference to indicators, valuation, and news>"
+  "reasoning": "<3-5 sentences with specific price levels, valuations, and news>"
 }}
 
-Be precise with price levels. Reference specific indicator values. Make a definitive call - do not be vague. Output ONLY valid JSON, no extra text."""
+Output ONLY valid JSON. No markdown, no extra text."""
     return prompt
 
 
@@ -211,29 +145,11 @@ def analyze_stock(ticker: str, info: dict, indicators: dict, news: list, chart_d
 
 
 def _fallback_analysis(ticker: str, indicators: dict, info: dict) -> dict:
-    """Rule-based fallback when no API key is provided."""
+    """Rule-based fallback when no Groq API key is provided."""
     score = 0
-    rsi = indicators.get("rsi")
-    macd = indicators.get("macd")
-    macd_signal = indicators.get("macd_signal")
-    price_above_sma50 = indicators.get("price_above_sma50")
+    price_above_sma50  = indicators.get("price_above_sma50")
     price_above_sma200 = indicators.get("price_above_sma200")
-    volume_ratio = indicators.get("volume_ratio")
-    stoch_k = indicators.get("stoch_k")
-    bb_pos = indicators.get("bb_position")
-
-    if rsi:
-        if rsi < 30:
-            score += 2
-        elif rsi < 40:
-            score += 1
-        elif rsi > 70:
-            score -= 2
-        elif rsi > 60:
-            score -= 1
-
-    if macd and macd_signal:
-        score += 1 if macd > macd_signal else -1
+    volume_ratio       = indicators.get("volume_ratio")
 
     if price_above_sma50:
         score += 1
@@ -253,49 +169,46 @@ def _fallback_analysis(ticker: str, indicators: dict, info: dict) -> dict:
     if indicators.get("death_cross_50_200"):
         score -= 2
 
-    if score >= 4:
-        decision = "STRONG BUY"
-        confidence = 80
-    elif score >= 2:
-        decision = "BUY"
-        confidence = 65
-    elif score <= -4:
-        decision = "STRONG SELL"
-        confidence = 80
-    elif score <= -2:
-        decision = "SELL"
-        confidence = 65
+    if score >= 3:
+        decision, confidence = "BUY", 60
+    elif score <= -3:
+        decision, confidence = "SELL", 60
     else:
-        decision = "HOLD"
-        confidence = 55
+        decision, confidence = "HOLD", 50
 
-    sr = indicators.get("support_resistance", {})
+    sr    = indicators.get("support_resistance", {})
     price = indicators.get("current_price", 0)
-    atr = indicators.get("atr") or 0
+    atr   = indicators.get("atr") or 0
+
+    def _mc(v):
+        if v is None: return "N/A"
+        if abs(v) >= 1e9: return f"${v/1e9:.1f}B"
+        if abs(v) >= 1e6: return f"${v/1e6:.1f}M"
+        return f"${v:,.0f}"
 
     return {
-        "ticker": ticker.upper(),
-        "decision": decision,
-        "confidence": confidence,
-        "entry_price": round(price, 2),
-        "stop_loss": round(price - 2 * atr, 2) if atr else None,
-        "profit_target": round(price + 3 * atr, 2) if atr else None,
-        "risk_reward_ratio": 1.5,
-        "time_horizon": "medium-term (weeks)",
+        "ticker":             ticker.upper(),
+        "decision":           decision,
+        "confidence":         confidence,
+        "entry_price":        round(price, 2),
+        "stop_loss":          round(price - 2 * atr, 2) if atr else None,
+        "profit_target":      round(price + 3 * atr, 2) if atr else None,
+        "risk_reward_ratio":  1.5,
+        "time_horizon":       "medium-term (weeks)",
         "trend": {
-            "daily": "bullish" if score > 0 else "bearish" if score < 0 else "neutral",
-            "weekly": "bullish" if price_above_sma50 else "bearish",
+            "daily":   "bullish" if score > 0 else "bearish" if score < 0 else "neutral",
+            "weekly":  "bullish" if price_above_sma50  else "bearish",
             "overall": "bullish" if price_above_sma200 else "bearish",
         },
-        "technical_summary": f"Rule-based analysis: RSI at {f'{rsi:.1f}' if rsi else 'N/A'}, MACD {'above' if macd and macd_signal and macd > macd_signal else 'below'} signal. Price is {'above' if price_above_sma200 else 'below'} SMA200.",
-        "fundamental_summary": f"P/E: {info.get('pe_ratio') or 'N/A'}, Market Cap: {('${:,.0f}'.format(info['market_cap'])) if info.get('market_cap') else 'N/A'}. Add GROQ_API_KEY for full AI analysis.",
-        "risk_factors": ["No API key — analysis is rule-based only", "Verify with full Groq AI analysis"],
-        "catalysts": ["Technical setup based on indicators"],
-        "news_sentiment": "neutral",
+        "technical_summary":   f"Price is {'above' if price_above_sma200 else 'below'} SMA200. Add GROQ_API_KEY for full AI analysis.",
+        "fundamental_summary": f"P/E: {info.get('pe_ratio') or 'N/A'}, Market Cap: {_mc(info.get('market_cap'))}.",
+        "risk_factors":        ["No API key — analysis is rule-based only", "Verify with full AI analysis"],
+        "catalysts":           ["Technical setup based on moving averages"],
+        "news_sentiment":      "neutral",
         "key_levels": {
-            "must_hold": sr.get("s1") or sr.get("support"),
+            "must_hold":       sr.get("s1") or sr.get("support"),
             "breakout_target": sr.get("r1") or sr.get("resistance"),
         },
-        "reasoning": f"Score-based decision ({score} points). Set GROQ_API_KEY environment variable for comprehensive AI analysis using Citadel, Morgan Stanley, Bridgewater, and Renaissance frameworks.",
-        "source": "rule-based-fallback",
+        "reasoning": f"Score-based decision ({score} points from SMA signals). Set GROQ_API_KEY for comprehensive AI analysis.",
+        "source":    "rule-based-fallback",
     }
