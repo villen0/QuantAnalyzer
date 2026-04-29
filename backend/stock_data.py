@@ -101,7 +101,8 @@ def fetch_stock_info(ticker: str) -> dict:
     }
 
 
-def _candles(ticker: str, period: str) -> dict:
+def _candles_finnhub(ticker: str, period: str) -> list[dict]:
+    """Fetch OHLCV from Finnhub (requires premium plan for /stock/candle)."""
     days = _PERIOD_DAYS.get(period, 90)
     now  = datetime.now(timezone.utc)
     data = _get(
@@ -112,10 +113,6 @@ def _candles(ticker: str, period: str) -> dict:
     )
     if data.get("s") != "ok":
         raise ValueError(f"No candle data for {ticker}")
-    return data
-
-
-def _parse_candles(data: dict) -> list[dict]:
     records = []
     for i, ts in enumerate(data.get("t", [])):
         records.append({
@@ -129,10 +126,67 @@ def _parse_candles(data: dict) -> list[dict]:
     return records
 
 
-def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
-    bars = _parse_candles(_candles(ticker, period))
+def _candles_stooq(ticker: str, period: str) -> list[dict]:
+    """Free OHLCV fallback via Stooq — no API key required."""
+    days     = _PERIOD_DAYS.get(period, 90)
+    today    = datetime.now(timezone.utc).date()
+    from_d   = (today - timedelta(days=days)).strftime("%Y%m%d")
+    to_d     = today.strftime("%Y%m%d")
+
+    # Stooq uses lowercase ticker with .us suffix for US equities
+    for symbol in (f"{ticker.lower()}.us", ticker.lower()):
+        try:
+            url = f"https://stooq.com/q/d/l/?s={symbol}&d1={from_d}&d2={to_d}&i=d"
+            r = requests.get(url, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
+            r.raise_for_status()
+            lines = [l for l in r.text.strip().splitlines() if l and not l.startswith("Date")]
+            if not lines:
+                continue
+            records = []
+            for line in lines:
+                parts = line.split(",")
+                if len(parts) < 5:
+                    continue
+                date_s, o, h, l, c = parts[0], parts[1], parts[2], parts[3], parts[4]
+                vol = parts[5].strip() if len(parts) > 5 else "0"
+                records.append({
+                    "date":   datetime.strptime(date_s, "%Y-%m-%d").strftime("%Y-%m-%d %H:%M"),
+                    "open":   round(float(o), 4),
+                    "high":   round(float(h), 4),
+                    "low":    round(float(l), 4),
+                    "close":  round(float(c), 4),
+                    "volume": int(float(vol)) if vol else 0,
+                })
+            if records:
+                # Stooq returns newest-first; reverse to chronological order
+                records.sort(key=lambda x: x["date"])
+                return records
+        except Exception:
+            continue
+    return []
+
+
+def _fetch_bars(ticker: str, period: str) -> list[dict]:
+    """Try Finnhub candles, fall back to Stooq on 403/permission error."""
+    try:
+        bars = _candles_finnhub(ticker, period)
+        if bars:
+            return bars
+    except Exception as e:
+        if "403" not in str(e) and "Forbidden" not in str(e) and "No candle" not in str(e):
+            raise  # re-raise non-permission errors (network, bad ticker, etc.)
+
+    bars = _candles_stooq(ticker, period)
     if not bars:
-        raise ValueError(f"Empty OHLCV for {ticker}")
+        raise ValueError(
+            f"Could not fetch price history for {ticker}. "
+            "Check the ticker symbol and try again."
+        )
+    return bars
+
+
+def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
+    bars = _fetch_bars(ticker, period)
     df = pd.DataFrame([{
         "Open": b["open"], "High": b["high"], "Low": b["low"],
         "Close": b["close"], "Volume": b["volume"],
@@ -143,10 +197,7 @@ def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.Da
 
 
 def fetch_ohlcv_for_chart(ticker: str, period: str = "3mo", interval: str = "1d") -> list:
-    bars = _parse_candles(_candles(ticker, period))
-    if not bars:
-        raise ValueError(f"Empty chart data for {ticker}")
-    return bars
+    return _fetch_bars(ticker, period)
 
 
 def fetch_realtime_price(ticker: str) -> dict:
