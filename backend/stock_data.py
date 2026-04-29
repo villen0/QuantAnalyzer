@@ -1,14 +1,19 @@
 import math
-import os
 import threading
 from datetime import datetime
-from typing import Optional
 
-import requests
+import yfinance as yf
 import pandas as pd
+import requests as std_requests
 from cachetools import TTLCache
 
-_FMP_BASE = "https://financialmodelingprep.com/api"
+# curl_cffi impersonates Chrome's TLS fingerprint — bypasses Yahoo Finance
+# IP blocks that affect cloud providers (Render, Railway, Heroku, etc.)
+try:
+    from curl_cffi import requests as cffi_requests
+    _session = cffi_requests.Session(impersonate="chrome110")
+except ImportError:
+    _session = None  # fallback to default yfinance session
 
 _lock_info   = threading.RLock()
 _lock_ohlcv  = threading.RLock()
@@ -16,34 +21,21 @@ _lock_price  = threading.RLock()
 _lock_earn   = threading.RLock()
 _lock_search = threading.RLock()
 
-_cache_info   = TTLCache(maxsize=128, ttl=86400)  # 24h — fundamentals
-_cache_ohlcv  = TTLCache(maxsize=256, ttl=7200)   # 2h  — OHLCV
-_cache_price  = TTLCache(maxsize=128, ttl=600)    # 10min — live price
+_cache_info   = TTLCache(maxsize=128, ttl=14400)  # 4h  — fundamentals
+_cache_ohlcv  = TTLCache(maxsize=256, ttl=3600)   # 1h  — OHLCV
+_cache_price  = TTLCache(maxsize=128, ttl=60)     # 60s — live price
 _cache_earn   = TTLCache(maxsize=128, ttl=86400)  # 24h — earnings
 _cache_search = TTLCache(maxsize=64,  ttl=600)    # 10min — search
 
-_PERIODS_TO_DAYS = {
-    "1mo": 32, "3mo": 93, "6mo": 185, "1y": 366, "2y": 732, "5y": 1827,
-}
-
+_YF_SEARCH = "https://query2.finance.yahoo.com/v1/finance/search"
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json",
 }
 
 
-def _api_key() -> str:
-    return os.environ.get("FMP_API_KEY", "demo")
-
-
-def _get(path: str, params: Optional[dict] = None):
-    url = f"{_FMP_BASE}{path}"
-    p = {"apikey": _api_key()}
-    if params:
-        p.update(params)
-    resp = requests.get(url, params=p, headers=_HEADERS, timeout=12)
-    resp.raise_for_status()
-    return resp.json()
+def _ticker(symbol: str) -> yf.Ticker:
+    return yf.Ticker(symbol, session=_session) if _session else yf.Ticker(symbol)
 
 
 def _f(d: dict, *keys):
@@ -61,71 +53,50 @@ def _f(d: dict, *keys):
     return None
 
 
-def _parse_range(range_str: str):
-    """Parse FMP range field '124.17-199.62' → (low, high)."""
-    try:
-        parts = str(range_str).split("-")
-        if len(parts) == 2:
-            return float(parts[0]), float(parts[1])
-    except Exception:
-        pass
-    return None, None
-
-
 def fetch_stock_info(ticker: str) -> dict:
     key = ticker.upper()
     with _lock_info:
         if key in _cache_info:
             return _cache_info[key]
 
-    # /v3/profile is on FMP's free tier
-    profile_list = _get(f"/v3/profile/{key}")
-    p = (profile_list if isinstance(profile_list, list) and profile_list else [{}])[0]
-
-    if not p.get("companyName") and not p.get("symbol"):
+    info = _ticker(key).info
+    if not info.get("shortName") and not info.get("longName"):
         raise ValueError(f"Unknown ticker '{key}'. Check the symbol and try again.")
-
-    w52_low, w52_high = _parse_range(p.get("range", ""))
-    price    = _f(p, "price")
-    changes  = _f(p, "changes")        # dollar change from prev close
-    prev_close = round(price - changes, 2) if price and changes is not None else None
-    div_amt  = _f(p, "lastDiv")        # last dividend amount (typically annual)
-    div_yield = round(div_amt / price, 6) if div_amt and price else None
 
     result = {
         "ticker":                 key,
-        "name":                   p.get("companyName") or key,
-        "sector":                 p.get("sector") or "N/A",
-        "industry":               p.get("industry") or "N/A",
-        "market_cap":             _f(p, "mktCap"),
-        "pe_ratio":               None,   # requires paid FMP tier
-        "forward_pe":             None,
-        "pb_ratio":               None,
-        "ps_ratio":               None,
-        "dividend_yield":         div_yield,
-        "beta":                   _f(p, "beta"),
-        "52w_high":               w52_high,
-        "52w_low":                w52_low,
-        "avg_volume":             _f(p, "volAvg"),
-        "eps":                    None,
-        "forward_eps":            None,
-        "revenue":                None,
-        "gross_margins":          None,
-        "operating_margins":      None,
-        "profit_margins":         None,
-        "debt_to_equity":         None,
-        "free_cashflow":          None,
-        "current_price":          price,
-        "target_mean_price":      None,
-        "recommendation":         "N/A",
-        "num_analyst_opinions":   None,
-        "short_ratio":            None,
-        "short_percent_of_float": None,
-        "description":            p.get("description") or "",
-        "website":                p.get("website") or "",
-        "country":                p.get("country") or "",
-        "employees":              int(p["fullTimeEmployees"]) if p.get("fullTimeEmployees") else None,
-        "_source":                "fmp",
+        "name":                   info.get("longName") or info.get("shortName") or key,
+        "sector":                 info.get("sector") or "N/A",
+        "industry":               info.get("industry") or "N/A",
+        "market_cap":             _f(info, "marketCap"),
+        "pe_ratio":               _f(info, "trailingPE"),
+        "forward_pe":             _f(info, "forwardPE"),
+        "pb_ratio":               _f(info, "priceToBook"),
+        "ps_ratio":               _f(info, "priceToSalesTrailing12Months"),
+        "dividend_yield":         _f(info, "dividendYield"),
+        "beta":                   _f(info, "beta"),
+        "52w_high":               _f(info, "fiftyTwoWeekHigh"),
+        "52w_low":                _f(info, "fiftyTwoWeekLow"),
+        "avg_volume":             _f(info, "averageVolume"),
+        "eps":                    _f(info, "trailingEps"),
+        "forward_eps":            _f(info, "forwardEps"),
+        "revenue":                _f(info, "totalRevenue"),
+        "gross_margins":          _f(info, "grossMargins"),
+        "operating_margins":      _f(info, "operatingMargins"),
+        "profit_margins":         _f(info, "profitMargins"),
+        "debt_to_equity":         _f(info, "debtToEquity"),
+        "free_cashflow":          _f(info, "freeCashflow"),
+        "current_price":          _f(info, "currentPrice") or _f(info, "regularMarketPrice"),
+        "target_mean_price":      _f(info, "targetMeanPrice"),
+        "recommendation":         info.get("recommendationKey") or "N/A",
+        "num_analyst_opinions":   int(info["numberOfAnalystOpinions"]) if info.get("numberOfAnalystOpinions") else None,
+        "short_ratio":            _f(info, "shortRatio"),
+        "short_percent_of_float": _f(info, "shortPercentOfFloat"),
+        "description":            info.get("longBusinessSummary") or "",
+        "website":                info.get("website") or "",
+        "country":                info.get("country") or "",
+        "employees":              int(info["fullTimeEmployees"]) if info.get("fullTimeEmployees") else None,
+        "_source":                "yfinance",
     }
 
     with _lock_info:
@@ -139,23 +110,11 @@ def _get_ohlcv_df(ticker: str, period: str) -> pd.DataFrame:
         if cache_key in _cache_ohlcv:
             return _cache_ohlcv[cache_key]
 
-    days = _PERIODS_TO_DAYS.get(period, 93)
-    data = _get(f"/v3/historical-price-full/{ticker.upper()}", {"timeseries": days})
-
-    historical = data.get("historical", []) if isinstance(data, dict) else []
-    if not historical:
+    df = _ticker(ticker.upper()).history(period=period, interval="1d", auto_adjust=True)
+    df.index = df.index.tz_localize(None)
+    if df.empty:
         raise ValueError(f"No price data for '{ticker}'. Check the symbol and try again.")
-
-    # FMP returns newest-first — reverse to chronological order
-    rows = list(reversed(historical))
-
-    df = pd.DataFrame(rows)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.set_index("date")
-    df = df.rename(columns={"open": "Open", "high": "High", "low": "Low",
-                             "close": "Close", "volume": "Volume"})
     df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-    df.index.name = None
 
     with _lock_ohlcv:
         _cache_ohlcv[cache_key] = df
@@ -187,26 +146,23 @@ def fetch_realtime_price(ticker: str) -> dict:
         if key in _cache_price:
             return _cache_price[key]
 
-    profile_list = _get(f"/v3/profile/{key}")
-    p = (profile_list if isinstance(profile_list, list) and profile_list else [{}])[0]
-
-    price = _f(p, "price")
+    fi    = _ticker(key).fast_info
+    price = getattr(fi, "last_price", None)
+    prev  = getattr(fi, "previous_close", None)
     if not price:
         raise ValueError(f"No price available for '{key}'")
 
-    changes    = _f(p, "changes") or 0.0          # dollar change
-    prev_close = round(price - changes, 2)
-    change_pct = round(changes / prev_close * 100, 2) if prev_close else 0.0
-
+    price = round(float(price), 2)
+    prev  = round(float(prev), 2) if prev else price
     result = {
         "ticker":     key,
-        "price":      round(price, 2),
-        "prev_close": prev_close,
-        "change":     round(changes, 2),
-        "change_pct": change_pct,
+        "price":      price,
+        "prev_close": prev,
+        "change":     round(price - prev, 2),
+        "change_pct": round((price - prev) / prev * 100, 2) if prev else 0.0,
         "volume":     None,
         "timestamp":  datetime.utcnow().isoformat(),
-        "_source":    "fmp",
+        "_source":    "yfinance",
     }
 
     with _lock_price:
@@ -220,8 +176,8 @@ def fetch_earnings_history(ticker: str) -> list:
         if key in _cache_earn:
             return _cache_earn[key]
     try:
-        data = _get(f"/v3/earnings-surprises/{key}")
-        if not data or not isinstance(data, list):
+        eh = _ticker(key).earnings_history
+        if eh is None or eh.empty:
             return []
 
         def _safe(v):
@@ -232,25 +188,16 @@ def fetch_earnings_history(ticker: str) -> list:
                 return None
 
         records = []
-        for item in data[:4]:
-            date_str = item.get("date", "")
-            try:
-                dt = datetime.strptime(date_str, "%Y-%m-%d")
-                quarter = f"Q{((dt.month - 1) // 3) + 1} {dt.year}"
-            except Exception:
-                quarter = date_str
-
-            actual   = _safe(item.get("actualEarningResult"))
-            estimate = _safe(item.get("estimatedEarning"))
-            surprise = None
-            if actual is not None and estimate is not None and estimate != 0:
-                surprise = round((actual - estimate) / abs(estimate) * 100, 2)
-
+        for ts, row in eh.tail(4).iloc[::-1].iterrows():
+            quarter      = f"Q{((ts.month - 1) // 3) + 1} {ts.year}"
+            actual       = _safe(row.get("Reported EPS") or row.get("epsActual"))
+            estimate     = _safe(row.get("EPS Estimate") or row.get("epsEstimate"))
+            surprise_pct = _safe(row.get("Surprise(%)") or row.get("surprisePercent"))
             records.append({
                 "quarter":      quarter,
                 "actual":       actual,
                 "estimate":     estimate,
-                "surprise_pct": surprise,
+                "surprise_pct": surprise_pct,
             })
 
         with _lock_earn:
@@ -266,18 +213,29 @@ def search_symbols(query: str, limit: int = 8) -> list:
         if cache_key in _cache_search:
             return _cache_search[cache_key]
     try:
-        data = _get("/v3/search", {"query": query.strip(), "limit": limit})
-        if not isinstance(data, list):
-            return []
+        resp = std_requests.get(
+            _YF_SEARCH,
+            params={
+                "q":                query.strip(),
+                "quotesCount":      limit,
+                "newsCount":        0,
+                "enableFuzzyQuery": "true",
+                "lang":             "en-US",
+            },
+            headers=_HEADERS,
+            timeout=8,
+        )
+        resp.raise_for_status()
+        allowed = {"EQUITY", "ETF", "INDEX"}
         out = [
             {
                 "symbol":   item.get("symbol", ""),
-                "name":     item.get("name") or "",
-                "exchange": item.get("stockExchange") or item.get("exchangeShortName") or "",
-                "type":     "STOCK",
+                "name":     item.get("longname") or item.get("shortname") or "",
+                "exchange": item.get("exchDisp") or item.get("exchange") or "",
+                "type":     item.get("quoteType", ""),
             }
-            for item in data
-            if item.get("symbol")
+            for item in resp.json().get("quotes", [])
+            if item.get("quoteType") in allowed
         ][:limit]
         with _lock_search:
             _cache_search[cache_key] = out
