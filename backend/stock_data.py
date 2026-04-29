@@ -16,8 +16,8 @@ _lock_price  = threading.RLock()
 _lock_earn   = threading.RLock()
 _lock_search = threading.RLock()
 
-_cache_info   = TTLCache(maxsize=128, ttl=86400)  # 24h — fundamentals (FMP 250/day budget)
-_cache_ohlcv  = TTLCache(maxsize=256, ttl=7200)   # 2h  — OHLCV / indicators
+_cache_info   = TTLCache(maxsize=128, ttl=86400)  # 24h — fundamentals
+_cache_ohlcv  = TTLCache(maxsize=256, ttl=7200)   # 2h  — OHLCV
 _cache_price  = TTLCache(maxsize=128, ttl=600)    # 10min — live price
 _cache_earn   = TTLCache(maxsize=128, ttl=86400)  # 24h — earnings
 _cache_search = TTLCache(maxsize=64,  ttl=600)    # 10min — search
@@ -47,7 +47,7 @@ def _get(path: str, params: Optional[dict] = None):
 
 
 def _f(d: dict, *keys):
-    """Safe float: returns the first non-None, non-NaN numeric value from d[key]."""
+    """Safe float: first non-None, non-NaN value from d."""
     for k in keys:
         v = d.get(k)
         if v is None:
@@ -61,56 +61,61 @@ def _f(d: dict, *keys):
     return None
 
 
+def _parse_range(range_str: str):
+    """Parse FMP range field '124.17-199.62' → (low, high)."""
+    try:
+        parts = str(range_str).split("-")
+        if len(parts) == 2:
+            return float(parts[0]), float(parts[1])
+    except Exception:
+        pass
+    return None, None
+
+
 def fetch_stock_info(ticker: str) -> dict:
     key = ticker.upper()
     with _lock_info:
         if key in _cache_info:
             return _cache_info[key]
 
-    # 3 FMP calls — cached 24h so costs ~3 req/ticker/day
-    quote_list   = _get(f"/v3/quote/{key}")
+    # /v3/profile is on FMP's free tier
     profile_list = _get(f"/v3/profile/{key}")
-    ratios_list  = _get(f"/v3/ratios-ttm/{key}")
-
-    q = (quote_list   if isinstance(quote_list,   list) and quote_list   else [{}])[0]
     p = (profile_list if isinstance(profile_list, list) and profile_list else [{}])[0]
-    r = (ratios_list  if isinstance(ratios_list,  list) and ratios_list  else [{}])[0]
 
-    if not q.get("name") and not p.get("companyName"):
+    if not p.get("companyName") and not p.get("symbol"):
         raise ValueError(f"Unknown ticker '{key}'. Check the symbol and try again.")
 
-    market_cap  = _f(q, "marketCap")
-    ps_ratio    = _f(r, "priceToSalesRatioTTM", "priceSalesRatioTTM")
-    revenue     = round(market_cap / ps_ratio, 0) if market_cap and ps_ratio else None
-
-    fcf_per_share = _f(r, "freeCashFlowPerShareTTM")
-    shares        = _f(q, "sharesOutstanding")
-    free_cashflow = round(fcf_per_share * shares, 0) if fcf_per_share and shares else None
+    w52_low, w52_high = _parse_range(p.get("range", ""))
+    price    = _f(p, "price")
+    changes  = _f(p, "changes")        # dollar change from prev close
+    prev_close = round(price - changes, 2) if price and changes is not None else None
+    div_amt  = _f(p, "lastDiv")        # last dividend amount (typically annual)
+    div_yield = round(div_amt / price, 6) if div_amt and price else None
 
     result = {
         "ticker":                 key,
-        "name":                   p.get("companyName") or q.get("name") or key,
+        "name":                   p.get("companyName") or key,
         "sector":                 p.get("sector") or "N/A",
         "industry":               p.get("industry") or "N/A",
-        "market_cap":             market_cap,
-        "pe_ratio":               _f(q, "pe"),
+        "market_cap":             _f(p, "mktCap"),
+        "pe_ratio":               None,   # requires paid FMP tier
         "forward_pe":             None,
-        "pb_ratio":               _f(r, "priceToBookRatioTTM"),
-        "ps_ratio":               ps_ratio,
-        "dividend_yield":         _f(r, "dividendYieldTTM", "dividendYielTTM"),
-        "beta":                   _f(p, "beta") or _f(q, "beta"),
-        "52w_high":               _f(q, "yearHigh"),
-        "52w_low":                _f(q, "yearLow"),
-        "avg_volume":             _f(q, "avgVolume"),
-        "eps":                    _f(q, "eps"),
+        "pb_ratio":               None,
+        "ps_ratio":               None,
+        "dividend_yield":         div_yield,
+        "beta":                   _f(p, "beta"),
+        "52w_high":               w52_high,
+        "52w_low":                w52_low,
+        "avg_volume":             _f(p, "volAvg"),
+        "eps":                    None,
         "forward_eps":            None,
-        "revenue":                revenue,
-        "gross_margins":          _f(r, "grossProfitMarginTTM"),
-        "operating_margins":      _f(r, "operatingProfitMarginTTM"),
-        "profit_margins":         _f(r, "netProfitMarginTTM"),
-        "debt_to_equity":         _f(r, "debtEquityRatioTTM"),
-        "free_cashflow":          free_cashflow,
-        "current_price":          _f(q, "price"),
+        "revenue":                None,
+        "gross_margins":          None,
+        "operating_margins":      None,
+        "profit_margins":         None,
+        "debt_to_equity":         None,
+        "free_cashflow":          None,
+        "current_price":          price,
         "target_mean_price":      None,
         "recommendation":         "N/A",
         "num_analyst_opinions":   None,
@@ -182,24 +187,24 @@ def fetch_realtime_price(ticker: str) -> dict:
         if key in _cache_price:
             return _cache_price[key]
 
-    data = _get(f"/v3/quote/{key}")
-    q = (data if isinstance(data, list) and data else [{}])[0]
+    profile_list = _get(f"/v3/profile/{key}")
+    p = (profile_list if isinstance(profile_list, list) and profile_list else [{}])[0]
 
-    price = _f(q, "price")
+    price = _f(p, "price")
     if not price:
         raise ValueError(f"No price available for '{key}'")
 
-    prev       = _f(q, "previousClose") or price
-    change     = _f(q, "change") or round(price - prev, 2)
-    change_pct = _f(q, "changesPercentage") or (round((price - prev) / prev * 100, 2) if prev else 0.0)
+    changes    = _f(p, "changes") or 0.0          # dollar change
+    prev_close = round(price - changes, 2)
+    change_pct = round(changes / prev_close * 100, 2) if prev_close else 0.0
 
     result = {
         "ticker":     key,
         "price":      round(price, 2),
-        "prev_close": round(prev, 2),
-        "change":     round(change, 2),
-        "change_pct": round(change_pct, 2),
-        "volume":     int(q.get("volume") or 0) or None,
+        "prev_close": prev_close,
+        "change":     round(changes, 2),
+        "change_pct": change_pct,
+        "volume":     None,
         "timestamp":  datetime.utcnow().isoformat(),
         "_source":    "fmp",
     }
