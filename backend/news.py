@@ -1,17 +1,54 @@
+import os
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 
 def fetch_stock_news(ticker: str, limit: int = 15) -> list:
-    articles = _fetch_google_news(ticker, limit)
+    articles = _fetch_finnhub_news(ticker, limit)
+    if not articles:
+        articles = _fetch_google_news(ticker, limit)
     if not articles:
         articles = _fetch_yahoo_rss(ticker, limit)
-    if not articles:
-        from mock_data import mock_news
-        return mock_news(ticker)[:limit]
     return articles[:limit]
+
+
+def _fetch_finnhub_news(ticker: str, limit: int) -> list:
+    key = os.environ.get("FINNHUB_API_KEY", "")
+    if not key:
+        return []
+    try:
+        today = datetime.utcnow().date()
+        from_date = (today - timedelta(days=30)).isoformat()
+        to_date = today.isoformat()
+        r = requests.get(
+            "https://finnhub.io/api/v1/company-news",
+            params={"symbol": ticker, "from": from_date, "to": to_date, "token": key},
+            headers={"User-Agent": "QuantAnalyzer/1.0"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        articles = []
+        for item in r.json()[:limit]:
+            ts = item.get("datetime", 0)
+            try:
+                published = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                published = ""
+            text = (item.get("headline") or "") + " " + (item.get("summary") or "")
+            articles.append({
+                "title":     item.get("headline", ""),
+                "summary":   item.get("summary", ""),
+                "url":       item.get("url", ""),
+                "source":    item.get("source", ""),
+                "published": published,
+                "image":     item.get("image", ""),
+                "sentiment": _basic_sentiment(text),
+            })
+        return articles
+    except Exception:
+        return []
 
 
 def _fetch_google_news(ticker: str, limit: int) -> list:
@@ -26,22 +63,17 @@ def _fetch_google_news(ticker: str, limit: int) -> list:
             return []
         articles = []
         for item in channel.findall("item")[:limit]:
-            title = item.findtext("title", "")
-            link = item.findtext("link", "")
+            title    = item.findtext("title", "")
+            link     = item.findtext("link", "")
             pub_date = item.findtext("pubDate", "")
-            source_el = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
-            source = item.findtext("source") or ""
+            source   = item.findtext("source") or ""
             try:
                 parsed = datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m-%d %H:%M")
             except Exception:
                 parsed = pub_date[:16] if pub_date else ""
             articles.append({
-                "title": title,
-                "summary": "",
-                "url": link,
-                "source": source,
-                "published": parsed,
-                "image": "",
+                "title": title, "summary": "", "url": link,
+                "source": source, "published": parsed, "image": "",
                 "sentiment": _basic_sentiment(title),
             })
         return articles
@@ -60,21 +92,17 @@ def _fetch_yahoo_rss(ticker: str, limit: int) -> list:
             return []
         articles = []
         for item in channel.findall("item")[:limit]:
-            title = item.findtext("title", "")
-            link = item.findtext("link", "")
+            title    = item.findtext("title", "")
+            link     = item.findtext("link", "")
             pub_date = item.findtext("pubDate", "")
-            desc = item.findtext("description", "")
+            desc     = item.findtext("description", "")
             try:
                 parsed = datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %z").strftime("%Y-%m-%d %H:%M")
             except Exception:
                 parsed = pub_date[:16] if pub_date else ""
             articles.append({
-                "title": title,
-                "summary": desc,
-                "url": link,
-                "source": "Yahoo Finance",
-                "published": parsed,
-                "image": "",
+                "title": title, "summary": desc, "url": link,
+                "source": "Yahoo Finance", "published": parsed, "image": "",
                 "sentiment": _basic_sentiment(title + " " + desc),
             })
         return articles
@@ -83,23 +111,17 @@ def _fetch_yahoo_rss(ticker: str, limit: int) -> list:
 
 
 def _basic_sentiment(text: str) -> str:
-    text_lower = text.lower()
-    bullish_words = [
+    t = text.lower()
+    bull = sum(1 for w in [
         "surge", "soar", "rally", "beat", "record", "growth", "profit", "gain",
         "upgrade", "outperform", "buy", "strong", "positive", "rise", "boost",
         "bullish", "opportunity", "exceed", "optimistic", "recovery", "breakout",
         "momentum", "high", "above", "better", "approve",
-    ]
-    bearish_words = [
+    ] if w in t)
+    bear = sum(1 for w in [
         "fall", "drop", "decline", "miss", "loss", "weak", "downgrade", "sell",
         "underperform", "bearish", "risk", "concern", "warning", "cut", "lower",
         "poor", "disappointing", "recession", "crash", "plunge", "tumble", "below",
         "worse", "layoff", "bankrupt", "sue", "investigation", "fine", "debt",
-    ]
-    bull_score = sum(1 for w in bullish_words if w in text_lower)
-    bear_score = sum(1 for w in bearish_words if w in text_lower)
-    if bull_score > bear_score:
-        return "bullish"
-    elif bear_score > bull_score:
-        return "bearish"
-    return "neutral"
+    ] if w in t)
+    return "bullish" if bull > bear else "bearish" if bear > bull else "neutral"
