@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardData, AIAnalysis, Trade } from '../types';
+import type { DashboardData, AIAnalysis, Trade, SMCAnalysis } from '../types';
 
 const api = axios.create({ baseURL: '/api', timeout: 60000 });
 
@@ -32,3 +32,6 @@ export const fetchAnalysisLog = (ticker?: string) => {
   const params = ticker ? `?ticker=${ticker}` : '';
   return api.get(`/analysis-log${params}`).then(r => r.data);
 };
+
+export const fetchSMCAnalysis = (ticker: string): Promise<SMCAnalysis> =>
+  api.get(`/smc-analysis/${ticker}`).then(r => r.data);

@@ -166,6 +166,25 @@ export interface Trade {
   timestamp: string;
 }
 
+export interface SMCAnalysis {
+  ticker: string;
+  bias: 'bullish' | 'bearish' | 'neutral';
+  market_structure: 'bullish' | 'bearish' | 'ranging';
+  setup_type: string;
+  entry: number | null;
+  stop_loss: number | null;
+  target_1: number | null;
+  target_2: number | null;
+  risk_reward: number | null;
+  confidence: number;
+  reasoning: string;
+  entry_note: string;
+  invalidation: string;
+  bos: { direction: string; level: number } | null;
+  choch: { direction: string; level: number; description?: string } | null;
+  pd_zone: string;
+}
+
 export interface DashboardData {
   ticker: string;
   info: StockInfo;
@@ -178,4 +197,5 @@ export interface DashboardData {
     estimate: number | null;
     surprise_pct: number | null;
   }>;
+  smc_analysis?: SMCAnalysis;
 }
