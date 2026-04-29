@@ -100,6 +100,130 @@ def compute_support_resistance(df: pd.DataFrame, lookback: int = 60):
     }
 
 
+def compute_smc(df: pd.DataFrame) -> dict:
+    """Smart Money Concepts: market structure, order blocks, FVGs, liquidity, premium/discount."""
+    highs  = df["High"]
+    lows   = df["Low"]
+    closes = df["Close"]
+    opens  = df["Open"]
+    current_price = float(closes.iloc[-1])
+
+    # Swing highs / lows (5-bar pivot)
+    window = 5
+    sh_list, sl_list = [], []
+    for i in range(window, len(df) - window):
+        h = float(highs.iloc[i])
+        if h == highs.iloc[i - window: i + window + 1].max():
+            sh_list.append({"idx": i, "price": round(h, 2)})
+        l = float(lows.iloc[i])
+        if l == lows.iloc[i - window: i + window + 1].min():
+            sl_list.append({"idx": i, "price": round(l, 2)})
+
+    # Market structure (HH/HL = bullish, LH/LL = bearish)
+    market_structure = "ranging"
+    if len(sh_list) >= 2 and len(sl_list) >= 2:
+        hh = sh_list[-1]["price"] > sh_list[-2]["price"]
+        hl = sl_list[-1]["price"] > sl_list[-2]["price"]
+        lh = sh_list[-1]["price"] < sh_list[-2]["price"]
+        ll = sl_list[-1]["price"] < sl_list[-2]["price"]
+        if hh and hl:
+            market_structure = "bullish"
+        elif lh and ll:
+            market_structure = "bearish"
+
+    # Break of Structure / Change of Character
+    bos, choch = None, None
+    if sh_list and sl_list:
+        last_sh = sh_list[-1]["price"]
+        last_sl = sl_list[-1]["price"]
+        if current_price > last_sh:
+            if market_structure == "bullish":
+                bos   = {"direction": "bullish", "level": last_sh}
+            else:
+                choch = {"direction": "bullish", "level": last_sh, "description": "Bearish-to-Bullish shift"}
+        elif current_price < last_sl:
+            if market_structure == "bearish":
+                bos   = {"direction": "bearish", "level": last_sl}
+            else:
+                choch = {"direction": "bearish", "level": last_sl, "description": "Bullish-to-Bearish shift"}
+
+    # Order Blocks (last 60 bars)
+    bullish_obs, bearish_obs = [], []
+    start = max(0, len(df) - 60)
+    for i in range(start, len(df) - 2):
+        o = float(opens.iloc[i]);  c = float(closes.iloc[i])
+        h = float(highs.iloc[i]);  l = float(lows.iloc[i])
+        nxt = df.iloc[i + 1: i + 3]
+        if len(nxt) < 2:
+            continue
+        # Bullish OB: bearish candle → 2 consecutive bullish candles with >0.8% move
+        if c < o and all(nxt["Close"] > nxt["Open"]):
+            move = (float(nxt["Close"].iloc[-1]) - l) / l
+            if move > 0.008:
+                bullish_obs.append({"high": round(h, 2), "low": round(l, 2), "mitigated": current_price < l})
+        # Bearish OB: bullish candle → 2 consecutive bearish candles with >0.8% move
+        if c > o and all(nxt["Close"] < nxt["Open"]):
+            move = (h - float(nxt["Close"].iloc[-1])) / h
+            if move > 0.008:
+                bearish_obs.append({"high": round(h, 2), "low": round(l, 2), "mitigated": current_price > h})
+
+    bullish_obs = bullish_obs[-3:][::-1]
+    bearish_obs = bearish_obs[-3:][::-1]
+
+    # Fair Value Gaps (3-candle imbalance)
+    fvgs = []
+    for i in range(2, len(df)):
+        pp_h = float(highs.iloc[i - 2]);  pp_l = float(lows.iloc[i - 2])
+        c_l  = float(lows.iloc[i]);       c_h  = float(highs.iloc[i])
+        if pp_h < c_l:   # bullish FVG
+            fvgs.append({"type": "bullish", "top": round(c_l, 2), "bottom": round(pp_h, 2),
+                          "size": round(c_l - pp_h, 2), "mitigated": current_price <= c_l and current_price >= pp_h})
+        if pp_l > c_h:   # bearish FVG
+            fvgs.append({"type": "bearish", "top": round(pp_l, 2), "bottom": round(c_h, 2),
+                          "size": round(pp_l - c_h, 2), "mitigated": current_price >= c_h and current_price <= pp_l})
+    recent_fvgs = fvgs[-5:][::-1]
+
+    # Liquidity pools — equal highs (sell-side) and equal lows (buy-side)
+    tolerance = 0.003
+    sell_side, buy_side = [], []
+    for i in range(len(sh_list)):
+        for j in range(i + 1, len(sh_list)):
+            p1, p2 = sh_list[i]["price"], sh_list[j]["price"]
+            if abs(p1 - p2) / p1 < tolerance:
+                level = round((p1 + p2) / 2, 2)
+                if level > current_price:
+                    sell_side.append(level)
+    for i in range(len(sl_list)):
+        for j in range(i + 1, len(sl_list)):
+            p1, p2 = sl_list[i]["price"], sl_list[j]["price"]
+            if abs(p1 - p2) / p1 < tolerance:
+                level = round((p1 + p2) / 2, 2)
+                if level < current_price:
+                    buy_side.append(level)
+    sell_side = sorted(set(sell_side))[:3]
+    buy_side  = sorted(set(buy_side), reverse=True)[:3]
+
+    # Premium / Discount (50% of 50-bar range)
+    recent    = df.tail(50)
+    rng_high  = round(float(recent["High"].max()), 2)
+    rng_low   = round(float(recent["Low"].min()),  2)
+    equil     = round((rng_high + rng_low) / 2, 2)
+    band      = (rng_high - rng_low) * 0.05
+    pd_zone   = "premium" if current_price > equil + band else "discount" if current_price < equil - band else "equilibrium"
+
+    return {
+        "market_structure": market_structure,
+        "bos":   bos,
+        "choch": choch,
+        "order_blocks": {"bullish": bullish_obs, "bearish": bearish_obs},
+        "fair_value_gaps": recent_fvgs,
+        "liquidity": {"sell_side": sell_side, "buy_side": buy_side},
+        "premium_discount": {"zone": pd_zone, "equilibrium": equil, "range_high": rng_high, "range_low": rng_low},
+        "swing_highs": [sh["price"] for sh in sh_list[-5:]],
+        "swing_lows":  [sl["price"] for sl in sl_list[-5:]],
+    }
+
+
 def compute_all_indicators(df: pd.DataFrame) -> dict:
     close = df["Close"]
     volume = df["Volume"]
@@ -176,4 +300,5 @@ def compute_all_indicators(df: pd.DataFrame) -> dict:
         "death_cross_50_200": death_cross_50_200,
         "fibonacci": {k: round(v, 2) for k, v in fib.items()},
         "support_resistance": sr,
+        "smc": compute_smc(df),
     }

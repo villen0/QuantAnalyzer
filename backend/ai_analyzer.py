@@ -37,6 +37,52 @@ def build_analysis_prompt(ticker: str, info: dict, indicators: dict, news: list,
     volume_ratio = indicators.get("volume_ratio")
     atr = indicators.get("atr")
     current_price = indicators.get("current_price")
+    smc = indicators.get("smc", {})
+
+    # Build SMC section text
+    smc_ms   = smc.get("market_structure", "N/A").upper()
+    smc_bos  = smc.get("bos")
+    smc_choch = smc.get("choch")
+    smc_pd   = smc.get("premium_discount", {})
+    smc_fvgs = smc.get("fair_value_gaps", [])
+    smc_obs  = smc.get("order_blocks", {})
+    smc_liq  = smc.get("liquidity", {})
+
+    def _ob_line(ob):
+        status = "mitigated" if ob.get("mitigated") else "active"
+        return f"${ob['low']}-${ob['high']} [{status}]"
+
+    bullish_ob_str = ", ".join(_ob_line(o) for o in smc_obs.get("bullish", [])) or "None detected"
+    bearish_ob_str = ", ".join(_ob_line(o) for o in smc_obs.get("bearish", [])) or "None detected"
+    fvg_str = ""
+    for fvg in smc_fvgs[:3]:
+        tag = "mitigated" if fvg.get("mitigated") else "open"
+        fvg_str += f"  {'▲' if fvg['type'] == 'bullish' else '▼'} {fvg['type'].upper()} FVG: ${fvg['bottom']}-${fvg['top']} (size ${fvg['size']}) [{tag}]\n"
+    if not fvg_str:
+        fvg_str = "  None detected\n"
+
+    smc_section = f"""
+═══════════════════════════════════════
+SMART MONEY CONCEPTS (SMC)
+═══════════════════════════════════════
+Market Structure: {smc_ms}
+{"BOS: " + ("BULLISH Break of Structure above $" + str(smc_bos['level'])) if smc_bos and smc_bos['direction'] == 'bullish' else "BOS: BEARISH Break of Structure below $" + str(smc_bos['level']) if smc_bos else "BOS: No active break"}
+{"CHoCH: " + smc_choch['description'] + " at $" + str(smc_choch['level']) if smc_choch else "CHoCH: None"}
+
+Premium / Discount Zone: {smc_pd.get('zone', 'N/A').upper()}
+  Equilibrium (50%): ${smc_pd.get('equilibrium', 'N/A')} | Range: ${smc_pd.get('range_low', 'N/A')} - ${smc_pd.get('range_high', 'N/A')}
+  {"→ Price in PREMIUM zone (above EQ) — favors shorts / caution for longs" if smc_pd.get('zone') == 'premium' else "→ Price in DISCOUNT zone (below EQ) — favors longs / caution for shorts" if smc_pd.get('zone') == 'discount' else "→ Price at EQUILIBRIUM — neutral zone"}
+
+Order Blocks:
+  Bullish OB(s): {bullish_ob_str}
+  Bearish OB(s): {bearish_ob_str}
+
+Fair Value Gaps (FVGs):
+{fvg_str}
+Liquidity Pools:
+  Sell-side (above price): {", ".join(f"${l}" for l in smc_liq.get("sell_side", [])) or "None identified"}
+  Buy-side (below price):  {", ".join(f"${l}" for l in smc_liq.get("buy_side", [])) or "None identified"}
+"""
 
     prompt = f"""You are a senior quantitative trader at Citadel who combines elite technical analysis with multi-framework institutional investment research to make precise BUY / SELL / HOLD calls.
 
@@ -91,7 +137,7 @@ Volume:
 
 Recent Price History (last 10 bars):
 {price_summary}
-
+{smc_section}
 ═══════════════════════════════════════
 NEWS SENTIMENT (Renaissance Tech Framework)
 ═══════════════════════════════════════
