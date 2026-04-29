@@ -37,10 +37,6 @@ export default function SMCPanel({ smc, currentPrice }: Props) {
     ? Math.min(100, Math.max(0, ((currentPrice - pd.range_low) / (pd.range_high - pd.range_low)) * 100))
     : 50;
 
-  const activeObs = [...smc.order_blocks.bullish.filter(o => !o.mitigated),
-                     ...smc.order_blocks.bearish.filter(o => !o.mitigated)];
-  const activeFvgs = smc.fair_value_gaps.filter(f => !f.mitigated);
-
   return (
     <div className="card">
       <div className="card-header">Smart Money Concepts (SMC)</div>
