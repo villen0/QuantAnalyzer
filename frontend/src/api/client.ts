@@ -25,6 +25,9 @@ export const logTrade = (trade: Omit<Trade, 'id' | 'timestamp' | 'total_value'>)
 export const deleteTrade = (id: number) =>
   api.delete(`/trades/${id}`).then(r => r.data);
 
+export const fetchSearch = (q: string): Promise<{ results: { symbol: string; name: string; exchange: string; type: string }[] }> =>
+  api.get(`/search?q=${encodeURIComponent(q)}`).then(r => r.data);
+
 export const fetchAnalysisLog = (ticker?: string) => {
   const params = ticker ? `?ticker=${ticker}` : '';
   return api.get(`/analysis-log${params}`).then(r => r.data);

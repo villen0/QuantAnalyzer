@@ -167,6 +167,25 @@ def fetch_realtime_price(ticker: str) -> dict:
     }
 
 
+def search_symbols(query: str, limit: int = 8) -> list:
+    try:
+        data = _get("/symbol_search", symbol=query, outputsize=limit)
+        results = data.get("data", [])
+        out = []
+        for r in results:
+            if r.get("instrument_type") not in ("Common Stock", "ETF", "Index"):
+                continue
+            out.append({
+                "symbol":   r.get("symbol", ""),
+                "name":     r.get("instrument_name", ""),
+                "exchange": r.get("exchange", ""),
+                "type":     r.get("instrument_type", ""),
+            })
+        return out[:limit]
+    except Exception:
+        return []
+
+
 def fetch_earnings_history(ticker: str) -> list:
     try:
         data = _get("/earnings", symbol=ticker, type="quarterly")
