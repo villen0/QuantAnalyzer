@@ -122,7 +122,7 @@ export default function SMCPanel({ smc, currentPrice }: Props) {
         <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
           Order Blocks
         </div>
-        {activeObs.length === 0 && (
+        {smc.order_blocks.bullish.every(o => o.mitigated) && smc.order_blocks.bearish.every(o => o.mitigated) && (
           <div style={{ fontSize: 12, color: '#475569', padding: '4px 0' }}>No active order blocks detected</div>
         )}
         {smc.order_blocks.bullish.map((ob, i) => (
