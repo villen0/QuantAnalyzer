@@ -111,7 +111,7 @@ def _fetch_yf(ticker: str, period: str) -> pd.DataFrame:
     if df is None or df.empty:
         raise ValueError(f"yfinance returned no data for '{ticker}'")
     if df.index.tz is not None:
-        df.index = df.index.tz_convert(None)
+        df.index = df.index.tz_convert("America/New_York").tz_localize(None)
     cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
     return df[cols].dropna()
 

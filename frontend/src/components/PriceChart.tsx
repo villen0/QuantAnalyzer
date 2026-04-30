@@ -25,25 +25,66 @@ const PERIOD_BUTTONS = [
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d) return null;
+
+  const isUp = d.close >= d.open;
+  const priceColor = isUp ? '#10b981' : '#ef4444';
+  const change = d.close - d.open;
+  const changePct = d.open > 0 ? (change / d.open) * 100 : 0;
+  const vol = d.volume >= 1e9
+    ? `${(d.volume / 1e9).toFixed(2)}B`
+    : `${(d.volume / 1e6).toFixed(2)}M`;
+
+  const dateStr = d.date?.includes(' ')
+    ? d.date.replace('T', ' ').slice(0, 16) + ' ET'
+    : d.date?.slice(0, 10);
+
   return (
     <div style={{
-      background: '#131c32', border: '1px solid #1e2d4a', borderRadius: 8,
-      padding: '10px 14px', fontSize: 12, color: '#e2e8f0', minWidth: 160,
+      background: '#0f1628', border: '1px solid #1e3a5f', borderRadius: 10,
+      padding: '12px 16px', fontSize: 12, color: '#e2e8f0',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.5)', minWidth: 190,
     }}>
-      <div style={{ color: '#64748b', marginBottom: 6, fontSize: 11 }}>{label}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
-        <span style={{ color: '#94a3b8' }}>Open</span>  <span style={{ fontWeight: 600 }}>${d.open}</span>
-        <span style={{ color: '#94a3b8' }}>High</span>  <span style={{ color: '#10b981', fontWeight: 600 }}>${d.high}</span>
-        <span style={{ color: '#94a3b8' }}>Low</span>   <span style={{ color: '#ef4444', fontWeight: 600 }}>${d.low}</span>
-        <span style={{ color: '#94a3b8' }}>Close</span> <span style={{ fontWeight: 600 }}>${d.close}</span>
-        <span style={{ color: '#94a3b8' }}>Volume</span><span style={{ color: '#60a5fa', fontWeight: 600 }}>{(d.volume / 1e6).toFixed(2)}M</span>
-        {d.sma20  && <><span style={{ color: '#94a3b8' }}>SMA20</span> <span style={{ color: '#f59e0b' }}>${d.sma20}</span></>}
-        {d.sma50  && <><span style={{ color: '#94a3b8' }}>SMA50</span> <span style={{ color: '#3b82f6' }}>${d.sma50}</span></>}
-        {d.sma200 && <><span style={{ color: '#94a3b8' }}>SMA200</span><span style={{ color: '#8b5cf6' }}>${d.sma200}</span></>}
+      {/* Date */}
+      <div style={{ fontSize: 11, color: '#475569', marginBottom: 6, letterSpacing: '0.02em' }}>
+        {dateStr}
+      </div>
+
+      {/* Close price + change */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 20, fontWeight: 800, color: priceColor, letterSpacing: '-0.5px' }}>
+          ${d.close.toFixed(2)}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: priceColor }}>
+          {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)} ({Math.abs(changePct).toFixed(2)}%)
+        </span>
+      </div>
+
+      {/* OHLC grid */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px',
+        paddingTop: 8, borderTop: '1px solid #1e2d4a', marginBottom: 8,
+      }}>
+        {[
+          { label: 'Open',  value: d.open,  color: '#94a3b8' },
+          { label: 'High',  value: d.high,  color: '#10b981' },
+          { label: 'Low',   value: d.low,   color: '#ef4444' },
+          { label: 'Close', value: d.close, color: '#e2e8f0' },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+            <span style={{ color: '#475569', fontSize: 11 }}>{label}</span>
+            <span style={{ color, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${value.toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Volume */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid #1e2d4a' }}>
+        <span style={{ color: '#475569', fontSize: 11 }}>Vol</span>
+        <span style={{ color: '#60a5fa', fontWeight: 600, fontSize: 11 }}>{vol}</span>
       </div>
     </div>
   );
