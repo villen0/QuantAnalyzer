@@ -9,7 +9,7 @@ import TradeLog from './components/TradeLog';
 import FundamentalsPanel from './components/FundamentalsPanel';
 import SMCPanel from './components/SMCPanel';
 import SMCAnalysisPanel from './components/SMCAnalysisPanel';
-import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade } from './api/client';
+import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade, fetchSMCAnalysis } from './api/client';
 import type { DashboardData, AIAnalysis, Trade, SMCAnalysis } from './types';
 
 type Tab = 'overview' | 'indicators' | 'fundamentals' | 'news' | 'trades';
@@ -32,6 +32,7 @@ export default function App() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [smcLoading, setSmcLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [liveChange, setLiveChange] = useState(0);
@@ -108,6 +109,18 @@ export default function App() {
       setError(e?.response?.data?.detail || e?.message || 'Analysis failed');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleRunSMCAnalysis = async () => {
+    setSmcLoading(true);
+    try {
+      const result = await fetchSMCAnalysis(ticker);
+      setSmcAnalysis(result);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || e?.message || 'SMC analysis failed');
+    } finally {
+      setSmcLoading(false);
     }
   };
 
@@ -198,7 +211,7 @@ export default function App() {
 
                 {/* Right column — SMC analysis + AI */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} />
+                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
                   <AIDecision
                     analysis={analysis}
                     onAnalyze={handleAnalyze}
@@ -219,7 +232,7 @@ export default function App() {
                   )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} />
+                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
                   <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
                 </div>
               </div>
