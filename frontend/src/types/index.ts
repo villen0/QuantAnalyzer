@@ -185,6 +185,39 @@ export interface SMCAnalysis {
   pd_zone: string;
 }
 
+export interface QuantBacktest {
+  total_trades: number;
+  win_rate: number | null;
+  avg_win: number | null;
+  avg_loss: number | null;
+  profit_factor: number | null;
+  sharpe: number | null;
+  max_drawdown: number | null;
+  total_return_pct: number | null;
+}
+
+export interface QuantStrategy {
+  signal: 'BUY' | 'SELL' | 'HOLD';
+  entry: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  rr_ratio: number | null;
+  position_size: number;
+  position_size_shares: number;
+  risk_amount: number;
+  sl_distance: number;
+  account_size: number;
+  indicators: {
+    price: number;
+    ma200: number | null;
+    rsi: number;
+    atr: number;
+    trend: 'bullish' | 'bearish';
+    rsi_zone: 'oversold' | 'overbought' | 'neutral';
+  };
+  backtest: QuantBacktest;
+}
+
 export interface DashboardData {
   ticker: string;
   info: StockInfo;

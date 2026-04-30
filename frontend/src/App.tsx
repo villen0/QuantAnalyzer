@@ -9,8 +9,9 @@ import TradeLog from './components/TradeLog';
 import FundamentalsPanel from './components/FundamentalsPanel';
 import SMCPanel from './components/SMCPanel';
 import SMCAnalysisPanel from './components/SMCAnalysisPanel';
-import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade, fetchSMCAnalysis } from './api/client';
-import type { DashboardData, AIAnalysis, Trade, SMCAnalysis } from './types';
+import QuantStrategyPanel from './components/QuantStrategyPanel';
+import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade, fetchSMCAnalysis, fetchQuantStrategy } from './api/client';
+import type { DashboardData, AIAnalysis, Trade, SMCAnalysis, QuantStrategy } from './types';
 
 type Tab = 'overview' | 'indicators' | 'fundamentals' | 'news' | 'trades';
 
@@ -29,6 +30,8 @@ export default function App() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [smcAnalysis, setSmcAnalysis] = useState<SMCAnalysis | null>(null);
+  const [quantStrategy, setQuantStrategy] = useState<QuantStrategy | null>(null);
+  const [quantLoading, setQuantLoading] = useState(false);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -44,6 +47,7 @@ export default function App() {
     setError(null);
     setAnalysis(null);
     setSmcAnalysis(null);
+    setQuantStrategy(null);
     setLivePrice(null);
     try {
       const d = await fetchDashboard(t, p);
@@ -109,6 +113,18 @@ export default function App() {
       setError(e?.response?.data?.detail || e?.message || 'Analysis failed');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleRunQuantStrategy = async () => {
+    setQuantLoading(true);
+    try {
+      const result = await fetchQuantStrategy(ticker);
+      setQuantStrategy(result);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || e?.message || 'Strategy analysis failed');
+    } finally {
+      setQuantLoading(false);
     }
   };
 
@@ -207,6 +223,11 @@ export default function App() {
                   {data.indicators.smc && (
                     <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
                   )}
+                  <QuantStrategyPanel
+                    data={quantStrategy}
+                    loading={quantLoading}
+                    onRun={handleRunQuantStrategy}
+                  />
                 </div>
 
                 {/* Right column — SMC analysis + AI */}
@@ -230,6 +251,11 @@ export default function App() {
                   {data.indicators.smc && (
                     <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
                   )}
+                  <QuantStrategyPanel
+                    data={quantStrategy}
+                    loading={quantLoading}
+                    onRun={handleRunQuantStrategy}
+                  />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />

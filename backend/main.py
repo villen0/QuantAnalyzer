@@ -14,6 +14,7 @@ from indicators import compute_all_indicators
 from news import fetch_stock_news
 from ai_analyzer import analyze_stock
 from smc_analyzer import analyze_smc
+from quant_strategy import compute_quant_strategy
 from trade_logger import log_trade, log_analysis, get_trades, get_analysis_log, delete_trade, init_db
 
 app = FastAPI(title="QuantAnalyzer API", version="1.0.0")
@@ -146,6 +147,25 @@ async def get_smc_analysis(ticker: str):
         current_price = indicators.get("current_price") or 0
         result = analyze_smc(ticker, smc, current_price, atr)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/quant-strategy/{ticker}")
+async def get_quant_strategy(
+    ticker: str,
+    period: str = Query("2y", description="History for backtest: 2y or 5y recommended"),
+    account_size: float = Query(10000.0, description="Account size for position sizing"),
+):
+    """Trend-following pullback strategy: MA200 trend filter + RSI entry + ATR stop."""
+    ticker = ticker.upper().strip()
+    try:
+        loop = asyncio.get_event_loop()
+        df   = await loop.run_in_executor(executor, fetch_ohlcv, ticker, period, "1d")
+        result = await loop.run_in_executor(executor, compute_quant_strategy, df, account_size)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
