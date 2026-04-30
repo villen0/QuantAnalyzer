@@ -71,7 +71,7 @@ export default function App() {
     loadTrades();
   }, []);
 
-  // Live price polling every 8s
+  // Live price polling every 5 min
   useEffect(() => {
     if (!ticker) return;
     const poll = async () => {
@@ -85,7 +85,7 @@ export default function App() {
       } catch { /* ignore */ }
     };
     poll();
-    priceInterval.current = setInterval(poll, 15000);
+    priceInterval.current = setInterval(poll, 300000);
     return () => { if (priceInterval.current) clearInterval(priceInterval.current); };
   }, [ticker]);
 

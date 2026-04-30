@@ -37,7 +37,7 @@ _lock_search = threading.RLock()
 
 _cache_info   = TTLCache(maxsize=128, ttl=14400)  # 4h  — fundamentals
 _cache_ohlcv  = TTLCache(maxsize=256, ttl=3600)   # 1h  — OHLCV
-_cache_price  = TTLCache(maxsize=128, ttl=60)     # 60s — live price
+_cache_price  = TTLCache(maxsize=128, ttl=300)    # 5min — live price
 _cache_earn   = TTLCache(maxsize=128, ttl=86400)  # 24h — earnings
 _cache_search = TTLCache(maxsize=64,  ttl=600)    # 10min — search
 
