@@ -222,14 +222,9 @@ export default function App() {
                   {data.indicators.smc && (
                     <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
                   )}
-                  <QuantStrategyPanel
-                    data={quantStrategy}
-                    loading={quantLoading}
-                    onRun={handleRunQuantStrategy}
-                  />
                 </div>
 
-                {/* Right column — SMC analysis + AI */}
+                {/* Right column — SMC analysis + AI + Quant Strategy */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
                   <AIDecision
@@ -237,6 +232,11 @@ export default function App() {
                     onAnalyze={handleAnalyze}
                     analyzing={analyzing}
                     ticker={ticker}
+                  />
+                  <QuantStrategyPanel
+                    data={quantStrategy}
+                    loading={quantLoading}
+                    onRun={handleRunQuantStrategy}
                   />
                 </div>
               </div>
@@ -250,15 +250,15 @@ export default function App() {
                   {data.indicators.smc && (
                     <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
                   )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
+                  <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
                   <QuantStrategyPanel
                     data={quantStrategy}
                     loading={quantLoading}
                     onRun={handleRunQuantStrategy}
                   />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
-                  <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
                 </div>
               </div>
             )}
