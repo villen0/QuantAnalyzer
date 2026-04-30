@@ -26,7 +26,23 @@ _HEADERS = {
 }
 
 _PERIODS_TO_DAYS = {
-    "1mo": 32, "3mo": 93, "6mo": 185, "1y": 366, "2y": 732, "5y": 1827,
+    "1d": 3, "5d": 8, "1mo": 35, "3mo": 95, "6mo": 185,
+    "ytd": None,  # computed dynamically
+    "1y": 370, "2y": 735, "5y": 1830, "max": 7300,
+}
+
+# Appropriate candle interval per period (yfinance native)
+_PERIOD_INTERVALS = {
+    "1d":  "5m",
+    "5d":  "1h",
+    "1mo": "1d",
+    "3mo": "1d",
+    "6mo": "1d",
+    "ytd": "1d",
+    "1y":  "1d",
+    "2y":  "1d",
+    "5y":  "1wk",
+    "max": "1wk",
 }
 
 _lock_info   = threading.RLock()
@@ -89,8 +105,9 @@ def _yf_summary(ticker: str) -> dict:
 
 def _fetch_yf(ticker: str, period: str) -> pd.DataFrame:
     """yfinance with curl_cffi Chrome impersonation — bypasses IP-based blocks."""
+    interval = _PERIOD_INTERVALS.get(period, "1d")
     t = yf.Ticker(ticker.upper(), session=_cffi_session)
-    df = t.history(period=period, interval="1d", auto_adjust=True)
+    df = t.history(period=period, interval=interval, auto_adjust=True)
     if df is None or df.empty:
         raise ValueError(f"yfinance returned no data for '{ticker}'")
     if df.index.tz is not None:
@@ -101,9 +118,12 @@ def _fetch_yf(ticker: str, period: str) -> pd.DataFrame:
 
 def _fetch_stooq(ticker: str, period: str) -> pd.DataFrame:
     """Stooq direct CSV — free, no auth, used as fallback."""
-    days  = _PERIODS_TO_DAYS.get(period, 93)
-    end   = datetime.now()
-    start = end - timedelta(days=days)
+    end = datetime.now()
+    if period == "ytd":
+        start = datetime(end.year, 1, 1)
+    else:
+        days  = _PERIODS_TO_DAYS.get(period) or 93
+        start = end - timedelta(days=days)
     resp  = requests.get(
         _STOOQ_BASE,
         params={"s": f"{ticker.lower()}.us", "d1": start.strftime("%Y%m%d"),
