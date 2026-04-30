@@ -7,3 +7,5 @@ python-dotenv>=1.0.0
 requests>=2.31.0
 aiofiles>=23.0.0
 cachetools>=5.3.0
+yfinance>=0.2.48
+curl_cffi>=0.6.2
