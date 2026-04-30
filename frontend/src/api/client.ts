@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardData, AIAnalysis, Trade, SMCAnalysis } from '../types';
+import type { DashboardData, AIAnalysis, Trade, SMCAnalysis, QuantStrategy } from '../types';
 
 const api = axios.create({ baseURL: '/api', timeout: 60000 });
 
@@ -35,3 +35,10 @@ export const fetchAnalysisLog = (ticker?: string) => {
 
 export const fetchSMCAnalysis = (ticker: string): Promise<SMCAnalysis> =>
   api.get(`/smc-analysis/${ticker}`).then(r => r.data);
+
+export const fetchQuantStrategy = (
+  ticker: string,
+  period = '2y',
+  accountSize = 10000,
+): Promise<QuantStrategy> =>
+  api.get(`/quant-strategy/${ticker}?period=${period}&account_size=${accountSize}`).then(r => r.data);
