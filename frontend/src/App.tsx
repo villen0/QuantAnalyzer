@@ -224,19 +224,19 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Right column — SMC analysis + AI + Quant Strategy */}
+                {/* Right column — SMC analysis + Quant Strategy + AI */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
+                  <QuantStrategyPanel
+                    data={quantStrategy}
+                    loading={quantLoading}
+                    onRun={handleRunQuantStrategy}
+                  />
                   <AIDecision
                     analysis={analysis}
                     onAnalyze={handleAnalyze}
                     analyzing={analyzing}
                     ticker={ticker}
-                  />
-                  <QuantStrategyPanel
-                    data={quantStrategy}
-                    loading={quantLoading}
-                    onRun={handleRunQuantStrategy}
                   />
                 </div>
               </div>
@@ -253,12 +253,12 @@ export default function App() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
-                  <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
                   <QuantStrategyPanel
                     data={quantStrategy}
                     loading={quantLoading}
                     onRun={handleRunQuantStrategy}
                   />
+                  <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
                 </div>
               </div>
             )}
