@@ -3,6 +3,8 @@ import type { SMCAnalysis } from '../types';
 interface Props {
   smc: SMCAnalysis | null;
   loading?: boolean;
+  smcLoading?: boolean;
+  onRunAnalysis?: () => void;
 }
 
 const biasColor = (bias: string) =>
@@ -26,11 +28,36 @@ const LevelBox = ({
   </div>
 );
 
-export default function SMCAnalysisPanel({ smc, loading }: Props) {
+const RunButton = ({ onClick, disabled, loading }: { onClick?: () => void; disabled: boolean; loading: boolean }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      background: loading ? '#0f1628' : '#1e3a5f',
+      border: `1px solid ${loading ? '#1e2d4a' : '#3b82f655'}`,
+      borderRadius: 6,
+      color: loading ? '#475569' : '#60a5fa',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      fontSize: 11,
+      fontWeight: 700,
+      padding: '4px 11px',
+      letterSpacing: '0.02em',
+      transition: 'all 0.2s',
+      whiteSpace: 'nowrap',
+    }}
+  >
+    {loading ? 'Analyzing…' : 'Run SMC Analysis'}
+  </button>
+);
+
+export default function SMCAnalysisPanel({ smc, loading, smcLoading, onRunAnalysis }: Props) {
   if (loading) {
     return (
       <div className="card">
-        <div className="card-header">SMC Analysis</div>
+        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>SMC Analysis</span>
+          <RunButton onClick={onRunAnalysis} disabled loading={false} />
+        </div>
         <div style={{ textAlign: 'center', padding: '30px', color: '#475569', fontSize: 13 }}>
           Computing SMC setup…
         </div>
@@ -41,7 +68,10 @@ export default function SMCAnalysisPanel({ smc, loading }: Props) {
   if (!smc) {
     return (
       <div className="card">
-        <div className="card-header">SMC Analysis</div>
+        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>SMC Analysis</span>
+          <RunButton onClick={onRunAnalysis} disabled={smcLoading ?? false} loading={smcLoading ?? false} />
+        </div>
         <div style={{ textAlign: 'center', padding: '30px', color: '#475569', fontSize: 13 }}>
           No SMC data available
         </div>
@@ -55,11 +85,9 @@ export default function SMCAnalysisPanel({ smc, loading }: Props) {
 
   return (
     <div className="card">
-      <div className="card-header">
-        SMC Analysis
-        <span style={{ float: 'right', fontSize: 10, color: '#475569', fontWeight: 400, marginTop: 1 }}>
-          Rule-based · Auto
-        </span>
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>SMC Analysis</span>
+        <RunButton onClick={onRunAnalysis} disabled={smcLoading ?? false} loading={smcLoading ?? false} />
       </div>
 
       {/* Bias + setup type header */}
