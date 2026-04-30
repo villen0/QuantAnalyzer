@@ -12,7 +12,16 @@ interface Props {
   onPeriodChange: (p: string) => void;
 }
 
-const PERIODS = ['1mo', '3mo', '6mo', '1y', '2y'];
+const PERIOD_BUTTONS = [
+  { label: '1D',  api: '1d'  },
+  { label: '1W',  api: '5d'  },
+  { label: '1M',  api: '1mo' },
+  { label: '3M',  api: '3mo' },
+  { label: 'YTD', api: 'ytd' },
+  { label: '1Y',  api: '1y'  },
+  { label: '5Y',  api: '5y'  },
+  { label: 'MAX', api: 'max' },
+];
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
 
@@ -168,7 +177,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
   return (
     <div className="card" style={{ padding: 0 }}>
 
-      {/* ── Row 1: title + overlays + periods ─── */}
+      {/* ── Row 1: title + overlays ─── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 20px 10px', borderBottom: '1px solid #1e2d4a', flexWrap: 'wrap', gap: 8,
@@ -177,18 +186,6 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
           <span className="card-header" style={{ marginBottom: 0 }}>Price Chart</span>
           <ToggleBtn label="BB"  active={showBB}  color="#10b981" onClick={() => setShowBB(v => !v)} />
           <ToggleBtn label="MAs" active={showSMA} color="#3b82f6" onClick={() => setShowSMA(v => !v)} />
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {PERIODS.map(p => (
-            <button key={p} onClick={() => onPeriodChange(p)} style={{
-              fontSize: 12, padding: '4px 10px', borderRadius: 6, fontWeight: 600,
-              background: p === period ? 'rgba(59,130,246,0.2)' : 'transparent',
-              color:      p === period ? '#60a5fa'               : '#64748b',
-              border:     `1px solid ${p === period ? 'rgba(59,130,246,0.4)' : 'transparent'}`,
-            }}>
-              {p.toUpperCase()}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -252,7 +249,14 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
             <CartesianGrid strokeDasharray="3 3" stroke="#1e2d4a" vertical={false} />
             <XAxis
               dataKey="date"
-              tickFormatter={v => v.slice(0, 10)}
+              tickFormatter={v => {
+                if (!v) return '';
+                const d = new Date(v.replace(' ', 'T'));
+                if (period === '1d') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                if (period === '5d') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                if (period === '5y' || period === 'max') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              }}
               tick={{ fontSize: 10, fill: '#64748b' }}
               tickLine={false} axisLine={false}
               interval="preserveStartEnd"
@@ -320,7 +324,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
 
       {/* MA Legend */}
       {showSMA && (
-        <div style={{ display: 'flex', gap: 16, padding: '8px 20px 14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 16, padding: '8px 20px 4px', flexWrap: 'wrap' }}>
           {[
             { color: '#e2e8f0', label: 'Price' },
             { color: '#f59e0b', label: `SMA20 $${indicators.sma20?.toFixed(2) ?? 'N/A'}` },
@@ -335,6 +339,32 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
           ))}
         </div>
       )}
+
+      {/* ── Robinhood-style period selector ─── */}
+      <div style={{
+        display: 'flex', justifyContent: 'center', gap: 2,
+        padding: '10px 20px 14px', borderTop: '1px solid #1e2d4a',
+      }}>
+        {PERIOD_BUTTONS.map(btn => {
+          const active = btn.api === period;
+          return (
+            <button
+              key={btn.api}
+              onClick={() => onPeriodChange(btn.api)}
+              style={{
+                fontSize: 12, padding: '5px 14px', borderRadius: 6, fontWeight: 700,
+                background: active ? 'rgba(245,158,11,0.12)' : 'transparent',
+                color:      active ? '#f59e0b'                : '#475569',
+                border:     `1px solid ${active ? 'rgba(245,158,11,0.35)' : 'transparent'}`,
+                transition: 'all 0.15s',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {btn.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
