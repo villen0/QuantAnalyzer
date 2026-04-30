@@ -106,17 +106,22 @@ def _get_ohlcv_df(ticker: str, period: str) -> pd.DataFrame:
     resp.raise_for_status()
 
     text = resp.text.strip()
-    if len(text) < 30 or "No data" in text or text.startswith("<"):
+    # Stooq returns HTML or plain-text error messages when data is unavailable.
+    # Validate we actually got a CSV before handing it to pandas.
+    if len(text) < 30 or text.startswith("<") or not text.lower().startswith("date"):
         raise ValueError(f"No price data for '{ticker}'. Check the symbol and try again.")
 
-    df = pd.read_csv(io.StringIO(text))
+    try:
+        df = pd.read_csv(io.StringIO(text), sep=",")
+    except Exception as e:
+        raise ValueError(f"Failed to parse price data for '{ticker}': {e}")
+
     df.columns = [c.strip() for c in df.columns]
+    required = {"Date", "Open", "High", "Low", "Close", "Volume"}
+    if not required.issubset(df.columns):
+        raise ValueError(f"Unexpected data format for '{ticker}'. Try again later.")
     df["Date"] = pd.to_datetime(df["Date"])
-    df = df.set_index("Date").sort_index()  # Stooq is newest-first sometimes
-    df = df.rename(columns={
-        "Open": "Open", "High": "High", "Low": "Low",
-        "Close": "Close", "Volume": "Volume",
-    })
+    df = df.set_index("Date").sort_index()
     df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
 
     if df.empty:
