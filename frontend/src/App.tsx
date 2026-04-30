@@ -5,22 +5,18 @@ import PriceChart from './components/PriceChart';
 import AIDecision from './components/AIDecision';
 import IndicatorPanel from './components/IndicatorPanel';
 import NewsPanel from './components/NewsPanel';
-import TradeLog from './components/TradeLog';
-import FundamentalsPanel from './components/FundamentalsPanel';
 import SMCPanel from './components/SMCPanel';
 import SMCAnalysisPanel from './components/SMCAnalysisPanel';
 import QuantStrategyPanel from './components/QuantStrategyPanel';
-import { fetchDashboard, fetchAnalysis, fetchPrice, fetchTrades, logTrade, deleteTrade, fetchSMCAnalysis, fetchQuantStrategy } from './api/client';
-import type { DashboardData, AIAnalysis, Trade, SMCAnalysis, QuantStrategy } from './types';
+import { fetchDashboard, fetchAnalysis, fetchPrice, fetchSMCAnalysis, fetchQuantStrategy } from './api/client';
+import type { DashboardData, AIAnalysis, SMCAnalysis, QuantStrategy } from './types';
 
-type Tab = 'overview' | 'indicators' | 'fundamentals' | 'news' | 'trades';
+type Tab = 'overview' | 'indicators' | 'news';
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
+  { key: 'overview',   label: 'Overview'  },
   { key: 'indicators', label: 'Technical' },
-  { key: 'fundamentals', label: 'Fundamentals' },
-  { key: 'news', label: 'News' },
-  { key: 'trades', label: 'Trade Log' },
+  { key: 'news',       label: 'News'      },
 ];
 
 export default function App() {
@@ -32,7 +28,6 @@ export default function App() {
   const [smcAnalysis, setSmcAnalysis] = useState<SMCAnalysis | null>(null);
   const [quantStrategy, setQuantStrategy] = useState<QuantStrategy | null>(null);
   const [quantLoading, setQuantLoading] = useState(false);
-  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [smcLoading, setSmcLoading] = useState(false);
@@ -61,17 +56,6 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const loadTrades = useCallback(async () => {
-    try {
-      const res = await fetchTrades();
-      setTrades(res.trades);
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    loadTrades();
   }, []);
 
   // Live price polling every 5 min
@@ -139,19 +123,9 @@ export default function App() {
     }
   };
 
-  const handleLogTrade = async (trade: Omit<Trade, 'id' | 'timestamp' | 'total_value'>) => {
-    await logTrade(trade);
-    await loadTrades();
-  };
-
-  const handleDeleteTrade = async (id: number) => {
-    await deleteTrade(id);
-    await loadTrades();
-  };
-
   return (
     <div style={{ minHeight: '100vh', background: '#0a0e1a' }}>
-      <StockSearch onSearch={handleSearch} loading={loading} currentTicker={ticker} />
+      <StockSearch onSearch={handleSearch} loading={loading} />
 
       {data && (
         <PriceHeader
@@ -178,11 +152,6 @@ export default function App() {
               }}
             >
               {t.label}
-              {t.key === 'trades' && trades.length > 0 && (
-                <span style={{ marginLeft: 6, background: 'rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
-                  {trades.length}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -224,7 +193,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Right column — SMC analysis + Quant Strategy + AI */}
+                {/* Right column */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
                   <QuantStrategyPanel
@@ -263,29 +232,11 @@ export default function App() {
               </div>
             )}
 
-            {tab === 'fundamentals' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
-                <FundamentalsPanel info={data.info} earnings={data.earnings} />
-                <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
-              </div>
-            )}
-
             {tab === 'news' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
                 <NewsPanel news={data.news} />
                 <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
               </div>
-            )}
-
-            {tab === 'trades' && (
-              <TradeLog
-                trades={trades}
-                onLog={handleLogTrade}
-                onDelete={handleDeleteTrade}
-                ticker={ticker}
-                analysis={analysis}
-                currentPrice={livePrice ?? data.info.current_price}
-              />
             )}
           </>
         )}
@@ -309,16 +260,14 @@ export default function App() {
             </div>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 14, maxWidth: 720, margin: '0 auto',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 14, maxWidth: 800, margin: '0 auto',
             }}>
               {[
-                { icon: '🕯️', title: 'Live Charts',       desc: 'Candlestick charts with EMA, Bollinger Bands & volume' },
-                { icon: '🧠', title: 'AI Analysis',        desc: 'Groq-powered reasoning with a clear BUY / SELL / HOLD verdict' },
-                { icon: '🏦', title: 'SMC Strategy',       desc: 'Order blocks, FVGs, BOS/CHoCH and liquidity zones' },
-                { icon: '📊', title: 'Quant Strategy',     desc: 'MA200 + RSI pullback system with full backtesting metrics' },
-                { icon: '📋', title: 'Fundamentals',       desc: 'P/E, revenue, margins, analyst ratings and more' },
-                { icon: '📓', title: 'Trade Log',          desc: 'Log and track your trades with real-time P&L' },
+                { icon: '🕯️', title: 'Live Charts',   desc: 'Candlestick charts with EMA, Bollinger Bands & volume' },
+                { icon: '🧠', title: 'AI Analysis',    desc: 'Groq-powered reasoning with a clear BUY / SELL / HOLD verdict' },
+                { icon: '🏦', title: 'SMC Strategy',   desc: 'Order blocks, FVGs, BOS/CHoCH and liquidity zones' },
+                { icon: '📊', title: 'Quant Strategy', desc: 'MA200 + RSI pullback system with full backtesting metrics' },
               ].map(f => (
                 <div key={f.title} style={{
                   background: '#0f1628', border: '1px solid #1e2d4a',

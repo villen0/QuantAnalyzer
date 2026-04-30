@@ -12,10 +12,9 @@ interface SearchResult {
 interface Props {
   onSearch: (ticker: string) => void;
   loading: boolean;
-  currentTicker: string;
 }
 
-export default function StockSearch({ onSearch, loading, currentTicker }: Props) {
+export default function StockSearch({ onSearch, loading }: Props) {
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -205,18 +204,6 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
           )}
         </div>
 
-        {/* Currently viewing badge */}
-        {currentTicker && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)',
-            borderRadius: 8, padding: '6px 14px',
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Viewing</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#60a5fa', fontFamily: 'monospace' }}>{currentTicker}</span>
-          </div>
-        )}
       </div>
     </div>
   );
