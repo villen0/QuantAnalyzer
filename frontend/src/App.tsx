@@ -24,7 +24,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const [ticker, setTicker] = useState('AAPL');
+  const [ticker, setTicker] = useState('');
   const [period, setPeriod] = useState('3mo');
   const [tab, setTab] = useState<Tab>('overview');
   const [data, setData] = useState<DashboardData | null>(null);
@@ -71,7 +71,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadData(ticker, period);
     loadTrades();
   }, []);
 
@@ -292,10 +291,49 @@ export default function App() {
         )}
 
         {!loading && !data && !error && (
-          <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📈</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>Search a stock to begin</div>
-            <div style={{ fontSize: 13 }}>Enter any ticker symbol above to get AI-powered analysis</div>
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 68, height: 68, borderRadius: 18, marginBottom: 22,
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              boxShadow: '0 0 40px #3b82f630',
+            }}>
+              <span style={{ fontSize: 30 }}>📈</span>
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#e2e8f0', marginBottom: 10, letterSpacing: '-0.4px' }}>
+              Welcome to QuantAnalyzer
+            </div>
+            <div style={{ fontSize: 14, color: '#64748b', marginBottom: 44, maxWidth: 460, margin: '0 auto 44px' }}>
+              Search any stock or ETF in the bar above to get real-time data,
+              technical analysis, SMC signals, and AI-powered trade decisions.
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 14, maxWidth: 720, margin: '0 auto',
+            }}>
+              {[
+                { icon: '🕯️', title: 'Live Charts',       desc: 'Candlestick charts with EMA, Bollinger Bands & volume' },
+                { icon: '🧠', title: 'AI Analysis',        desc: 'Groq-powered reasoning with a clear BUY / SELL / HOLD verdict' },
+                { icon: '🏦', title: 'SMC Strategy',       desc: 'Order blocks, FVGs, BOS/CHoCH and liquidity zones' },
+                { icon: '📊', title: 'Quant Strategy',     desc: 'MA200 + RSI pullback system with full backtesting metrics' },
+                { icon: '📋', title: 'Fundamentals',       desc: 'P/E, revenue, margins, analyst ratings and more' },
+                { icon: '📓', title: 'Trade Log',          desc: 'Log and track your trades with real-time P&L' },
+              ].map(f => (
+                <div key={f.title} style={{
+                  background: '#0f1628', border: '1px solid #1e2d4a',
+                  borderRadius: 12, padding: '18px 16px', textAlign: 'left',
+                  transition: 'border-color 0.2s',
+                }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>{f.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 5 }}>{f.title}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>{f.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 36, fontSize: 12, color: '#334155' }}>
+              Try searching: AAPL · TSLA · NVDA · SPY · BTC-USD
+            </div>
           </div>
         )}
       </div>
