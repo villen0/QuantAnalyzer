@@ -6,7 +6,12 @@ from typing import Optional
 
 import requests
 import pandas as pd
+import yfinance as yf
 from cachetools import TTLCache
+from curl_cffi import requests as cffi_requests
+
+# Shared curl_cffi session — impersonates Chrome to bypass IP-based blocks
+_cffi_session = cffi_requests.Session(impersonate="chrome")
 
 _STOOQ_BASE = "https://stooq.com/q/d/l/"
 _YF_SUMMARY = "https://query2.finance.yahoo.com/v10/finance/quoteSummary"
@@ -32,7 +37,7 @@ _lock_search = threading.RLock()
 
 _cache_info   = TTLCache(maxsize=128, ttl=14400)  # 4h  — fundamentals
 _cache_ohlcv  = TTLCache(maxsize=256, ttl=3600)   # 1h  — OHLCV
-_cache_price  = TTLCache(maxsize=128, ttl=60)     # 60s — live price
+_cache_price  = TTLCache(maxsize=128, ttl=300)    # 5min — live price
 _cache_earn   = TTLCache(maxsize=128, ttl=86400)  # 24h — earnings
 _cache_search = TTLCache(maxsize=64,  ttl=600)    # 10min — search
 
@@ -80,7 +85,47 @@ def _yf_summary(ticker: str) -> dict:
         return {}
 
 
-# ── OHLCV via Stooq (unlimited, no auth, no IP blocking) ─────────────────────
+# ── OHLCV — yfinance+curl_cffi primary, Stooq fallback ───────────────────────
+
+def _fetch_yf(ticker: str, period: str) -> pd.DataFrame:
+    """yfinance with curl_cffi Chrome impersonation — bypasses IP-based blocks."""
+    t = yf.Ticker(ticker.upper(), session=_cffi_session)
+    df = t.history(period=period, interval="1d", auto_adjust=True)
+    if df is None or df.empty:
+        raise ValueError(f"yfinance returned no data for '{ticker}'")
+    if df.index.tz is not None:
+        df.index = df.index.tz_convert(None)
+    cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
+    return df[cols].dropna()
+
+
+def _fetch_stooq(ticker: str, period: str) -> pd.DataFrame:
+    """Stooq direct CSV — free, no auth, used as fallback."""
+    days  = _PERIODS_TO_DAYS.get(period, 93)
+    end   = datetime.now()
+    start = end - timedelta(days=days)
+    resp  = requests.get(
+        _STOOQ_BASE,
+        params={"s": f"{ticker.lower()}.us", "d1": start.strftime("%Y%m%d"),
+                "d2": end.strftime("%Y%m%d"), "i": "d"},
+        headers={"User-Agent": _HEADERS["User-Agent"]},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    text = resp.text.strip()
+    if len(text) < 30 or text.startswith("<") or not text.lower().startswith("date"):
+        raise ValueError(f"Stooq returned no CSV data for '{ticker}'")
+    try:
+        df = pd.read_csv(io.StringIO(text), sep=",")
+    except Exception as e:
+        raise ValueError(f"Failed to parse Stooq data for '{ticker}': {e}")
+    df.columns = [c.strip() for c in df.columns]
+    if not {"Date", "Open", "High", "Low", "Close", "Volume"}.issubset(df.columns):
+        raise ValueError(f"Unexpected Stooq columns for '{ticker}'")
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.set_index("Date").sort_index()
+    return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+
 
 def _get_ohlcv_df(ticker: str, period: str) -> pd.DataFrame:
     cache_key = (ticker.upper(), period)
@@ -88,48 +133,18 @@ def _get_ohlcv_df(ticker: str, period: str) -> pd.DataFrame:
         if cache_key in _cache_ohlcv:
             return _cache_ohlcv[cache_key]
 
-    days  = _PERIODS_TO_DAYS.get(period, 93)
-    end   = datetime.now()
-    start = end - timedelta(days=days)
+    last_err: Exception = ValueError("All data sources failed")
+    for fetch_fn in (_fetch_yf, _fetch_stooq):
+        try:
+            df = fetch_fn(ticker, period)
+            if not df.empty:
+                with _lock_ohlcv:
+                    _cache_ohlcv[cache_key] = df
+                return df
+        except Exception as exc:
+            last_err = exc
 
-    resp = requests.get(
-        _STOOQ_BASE,
-        params={
-            "s":  f"{ticker.lower()}.us",
-            "d1": start.strftime("%Y%m%d"),
-            "d2": end.strftime("%Y%m%d"),
-            "i":  "d",
-        },
-        headers={"User-Agent": _HEADERS["User-Agent"]},
-        timeout=10,
-    )
-    resp.raise_for_status()
-
-    text = resp.text.strip()
-    # Stooq returns HTML or plain-text error messages when data is unavailable.
-    # Validate we actually got a CSV before handing it to pandas.
-    if len(text) < 30 or text.startswith("<") or not text.lower().startswith("date"):
-        raise ValueError(f"No price data for '{ticker}'. Check the symbol and try again.")
-
-    try:
-        df = pd.read_csv(io.StringIO(text), sep=",")
-    except Exception as e:
-        raise ValueError(f"Failed to parse price data for '{ticker}': {e}")
-
-    df.columns = [c.strip() for c in df.columns]
-    required = {"Date", "Open", "High", "Low", "Close", "Volume"}
-    if not required.issubset(df.columns):
-        raise ValueError(f"Unexpected data format for '{ticker}'. Try again later.")
-    df["Date"] = pd.to_datetime(df["Date"])
-    df = df.set_index("Date").sort_index()
-    df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
-
-    if df.empty:
-        raise ValueError(f"No price data for '{ticker}'. Check the symbol and try again.")
-
-    with _lock_ohlcv:
-        _cache_ohlcv[cache_key] = df
-    return df
+    raise ValueError(f"No price data for '{ticker}'. Check the symbol and try again.")
 
 
 def fetch_ohlcv(ticker: str, period: str = "3mo", interval: str = "1d") -> pd.DataFrame:
@@ -227,7 +242,7 @@ def fetch_realtime_price(ticker: str) -> dict:
 
     price = prev = change = change_pct = None
 
-    # Primary: Yahoo v7/finance/quote (lightweight, usually not blocked)
+    # Primary: Yahoo v7/finance/quote
     try:
         resp = requests.get(
             _YF_QUOTE,
@@ -245,7 +260,18 @@ def fetch_realtime_price(ticker: str) -> dict:
     except Exception:
         pass
 
-    # Fallback: last row of Stooq 5-day data
+    # Secondary: yfinance fast_info via curl_cffi session
+    if not price:
+        try:
+            fi = yf.Ticker(key, session=_cffi_session).fast_info
+            price      = fi.last_price
+            prev       = fi.previous_close
+            change     = round(price - prev, 2) if price and prev else None
+            change_pct = round((price - prev) / prev * 100, 2) if price and prev else None
+        except Exception:
+            pass
+
+    # Fallback: last close from OHLCV data
     if not price:
         try:
             df = _get_ohlcv_df(key, "1mo")
