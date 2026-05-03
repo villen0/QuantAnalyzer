@@ -8,14 +8,6 @@ interface Props {
   liveChangePct: number;
 }
 
-const fmt = (n: number | null | undefined, prefix = '', suffix = '', decimals = 2) => {
-  if (n == null || isNaN(n)) return 'N/A';
-  if (Math.abs(n) >= 1e12) return `${prefix}${(n / 1e12).toFixed(2)}T${suffix}`;
-  if (Math.abs(n) >= 1e9)  return `${prefix}${(n / 1e9).toFixed(2)}B${suffix}`;
-  if (Math.abs(n) >= 1e6)  return `${prefix}${(n / 1e6).toFixed(2)}M${suffix}`;
-  return `${prefix}${n.toFixed(decimals)}${suffix}`;
-};
-
 export default function PriceHeader({ info, livePrice, liveChange, liveChangePct }: Props) {
   const price = livePrice ?? info.current_price;
   const isUp = liveChange >= 0;
@@ -48,24 +40,15 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
     flash === 'down' ? 'rgba(239,68,68,0.18)'  : 'transparent';
 
   return (
-    <div style={{ background: '#0f1628', borderBottom: '1px solid #1e2d4a', padding: '16px 24px' }}>
+    <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 32, flexWrap: 'wrap' }}>
 
           {/* Name + live price */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 24, fontWeight: 800, color: '#e2e8f0' }}>{info.ticker}</span>
-              <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 400 }}>{info.name}</span>
-              {info.sector !== 'N/A' && (
-                <span style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                  background: 'rgba(59,130,246,0.15)', color: '#60a5fa',
-                  border: '1px solid rgba(59,130,246,0.3)', fontWeight: 600,
-                }}>
-                  {info.sector}
-                </span>
-              )}
+              <span style={{ fontSize: 24, fontWeight: 800, color: '#111827' }}>{info.ticker}</span>
+              <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 400 }}>{info.name}</span>
               {/* LIVE indicator */}
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#10b981', letterSpacing: '0.08em' }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', animation: 'livePulse 1.8s ease-in-out infinite', display: 'inline-block' }} />
@@ -82,7 +65,7 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
               animation: flash ? `priceFlash${flash === 'up' ? 'Up' : 'Down'} 0.8s ease-out` : undefined,
             }}>
               <span style={{
-                fontSize: 38, fontWeight: 800, color: '#e2e8f0', letterSpacing: '-1.5px',
+                fontSize: 38, fontWeight: 800, color: '#111827', letterSpacing: '-1.5px',
                 transition: 'color 0.3s ease',
               }}>
                 ${price?.toFixed(2) ?? '—'}
@@ -107,29 +90,12 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
 
             {/* Last updated */}
             {lastUpdated && (
-              <div style={{ fontSize: 10, color: '#475569', marginTop: 4, paddingLeft: 12 }}>
+              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, paddingLeft: 12 }}>
                 Updated {lastUpdated}
               </div>
             )}
           </div>
 
-          {/* Key stats */}
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
-            {[
-              { label: 'Market Cap',      value: fmt(info.market_cap, '$') },
-              { label: 'P/E Ratio',       value: info.pe_ratio?.toFixed(1) ?? 'N/A' },
-              { label: 'Beta',            value: info.beta?.toFixed(2) ?? 'N/A' },
-              { label: '52W High',        value: `$${info['52w_high']?.toFixed(2) ?? 'N/A'}` },
-              { label: '52W Low',         value: `$${info['52w_low']?.toFixed(2) ?? 'N/A'}` },
-              { label: 'Avg Volume',      value: fmt(info.avg_volume) },
-              { label: 'Analyst Target',  value: `$${info.target_mean_price?.toFixed(2) ?? 'N/A'}` },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{value}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 

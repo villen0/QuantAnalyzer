@@ -15,7 +15,7 @@ from news import fetch_stock_news
 from ai_analyzer import analyze_stock
 from smc_analyzer import analyze_smc
 from quant_strategy import compute_quant_strategy
-from trade_logger import log_trade, log_analysis, get_trades, get_analysis_log, delete_trade, init_db
+from trade_logger import log_analysis, get_analysis_log, init_db
 
 app = FastAPI(title="QuantAnalyzer API", version="1.0.0")
 
@@ -202,55 +202,6 @@ async def get_full_dashboard(ticker: str, period: str = Query("3mo")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ── Trade Log Endpoints ──────────────────────────────────────────────────────
-
-class TradeRequest(BaseModel):
-    ticker: str
-    action: str
-    price: float
-    shares: float
-    ai_decision: Optional[str] = ""
-    ai_confidence: Optional[int] = 0
-    ai_reasoning: Optional[str] = ""
-    technical_summary: Optional[str] = ""
-    stop_loss: Optional[float] = None
-    profit_target: Optional[float] = None
-    risk_reward: Optional[float] = None
-    notes: Optional[str] = ""
-
-
-@app.post("/api/trades")
-def create_trade(req: TradeRequest):
-    result = log_trade(
-        ticker=req.ticker,
-        action=req.action,
-        price=req.price,
-        shares=req.shares,
-        ai_decision=req.ai_decision or "",
-        ai_confidence=req.ai_confidence or 0,
-        ai_reasoning=req.ai_reasoning or "",
-        technical_summary=req.technical_summary or "",
-        stop_loss=req.stop_loss,
-        profit_target=req.profit_target,
-        risk_reward=req.risk_reward,
-        notes=req.notes or "",
-    )
-    return result
-
-
-@app.get("/api/trades")
-def list_trades(ticker: Optional[str] = Query(None), limit: int = Query(50)):
-    trades = get_trades(ticker, limit)
-    return {"trades": trades, "count": len(trades)}
-
-
-@app.delete("/api/trades/{trade_id}")
-def remove_trade(trade_id: int):
-    success = delete_trade(trade_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Trade not found")
-    return {"deleted": trade_id}
 
 
 @app.get("/api/analysis-log")

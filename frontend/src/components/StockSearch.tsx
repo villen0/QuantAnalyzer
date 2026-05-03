@@ -12,10 +12,9 @@ interface SearchResult {
 interface Props {
   onSearch: (ticker: string) => void;
   loading: boolean;
-  currentTicker: string;
 }
 
-export default function StockSearch({ onSearch, loading, currentTicker }: Props) {
+export default function StockSearch({ onSearch, loading }: Props) {
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -93,7 +92,7 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
   };
 
   return (
-    <div style={{ background: '#0f1628', borderBottom: '1px solid #1e2d4a', padding: '14px 24px' }}>
+    <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '14px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
 
         {/* Logo */}
@@ -106,8 +105,8 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
             <TrendingUp size={20} color="white" />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.3px' }}>QuantAnalyzer</div>
-            <div style={{ fontSize: 10, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>AI Trading Intelligence</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', letterSpacing: '-0.3px' }}>QuantAnalyzer</div>
+            <div style={{ fontSize: 10, color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase' }}>AI Trading Intelligence</div>
           </div>
         </div>
 
@@ -117,7 +116,7 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
             <div style={{ position: 'relative', flex: 1 }}>
               <Search
                 size={16}
-                style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: searching ? '#3b82f6' : '#64748b', transition: 'color 0.2s' }}
+                style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: searching ? '#2563eb' : '#9ca3af', transition: 'color 0.2s' }}
               />
               <input
                 type="text"
@@ -133,7 +132,7 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
               {value && (
                 <button
                   onClick={() => { setValue(''); setResults([]); setOpen(false); }}
-                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, color: '#64748b', cursor: 'pointer', display: 'flex' }}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, color: '#9ca3af', cursor: 'pointer', display: 'flex' }}
                 >
                   <X size={14} />
                 </button>
@@ -143,7 +142,7 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
               onClick={() => { const t = value.trim().toUpperCase(); if (t) commit(t); }}
               disabled={loading || !value.trim()}
               style={{
-                background: loading || !value.trim() ? '#1e2d4a' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                background: loading || !value.trim() ? '#e5e7eb' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                 color: 'white', border: 'none', borderRadius: 8,
                 padding: '0 20px', fontSize: 14, fontWeight: 600,
                 opacity: loading || !value.trim() ? 0.6 : 1,
@@ -158,7 +157,7 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
           {open && results.length > 0 && (
             <div style={{
               position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-              background: '#0f1628', border: '1px solid #1e3a5f',
+              background: '#ffffff', border: '1px solid #e5e7eb',
               borderRadius: 10, overflow: 'hidden',
               boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
               zIndex: 1000,
@@ -171,24 +170,24 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     width: '100%', padding: '10px 14px',
-                    background: i === highlighted ? 'rgba(59,130,246,0.12)' : 'transparent',
-                    border: 'none', borderBottom: i < results.length - 1 ? '1px solid rgba(30,58,95,0.6)' : 'none',
+                    background: i === highlighted ? 'rgba(37,99,235,0.05)' : 'transparent',
+                    border: 'none', borderBottom: i < results.length - 1 ? '1px solid #f3f4f6' : 'none',
                     cursor: 'pointer', textAlign: 'left',
                   }}
                 >
                   <div style={{
                     minWidth: 52, textAlign: 'center',
-                    background: 'rgba(59,130,246,0.15)', borderRadius: 5,
+                    background: 'rgba(37,99,235,0.08)', borderRadius: 5,
                     padding: '2px 6px', fontSize: 12, fontWeight: 700,
-                    color: '#60a5fa', fontFamily: 'monospace',
+                    color: '#2563eb', fontFamily: 'monospace',
                   }}>
                     {r.symbol}
                   </div>
                   <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {r.name}
                     </div>
-                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>
                       {r.exchange}
                     </div>
                   </div>
@@ -205,18 +204,6 @@ export default function StockSearch({ onSearch, loading, currentTicker }: Props)
           )}
         </div>
 
-        {/* Currently viewing badge */}
-        {currentTicker && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)',
-            borderRadius: 8, padding: '6px 14px',
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Viewing</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#60a5fa', fontFamily: 'monospace' }}>{currentTicker}</span>
-          </div>
-        )}
       </div>
     </div>
   );
