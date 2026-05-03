@@ -124,7 +124,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0e1a' }}>
+    <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
       <StockSearch onSearch={handleSearch} loading={loading} />
 
       {data && (
@@ -137,7 +137,7 @@ export default function App() {
       )}
 
       {/* Tabs */}
-      <div style={{ background: '#0f1628', borderBottom: '1px solid #1e2d4a', padding: '0 24px' }}>
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', gap: 0 }}>
           {TABS.map(t => (
             <button
@@ -145,9 +145,9 @@ export default function App() {
               onClick={() => setTab(t.key)}
               style={{
                 background: 'none', border: 'none',
-                color: tab === t.key ? '#60a5fa' : '#64748b',
+                color: tab === t.key ? '#2563eb' : '#6b7280',
                 padding: '12px 20px', fontSize: 13, fontWeight: 600,
-                borderBottom: `2px solid ${tab === t.key ? '#3b82f6' : 'transparent'}`,
+                borderBottom: `2px solid ${tab === t.key ? '#2563eb' : 'transparent'}`,
                 transition: 'all 0.2s',
               }}
             >
@@ -161,8 +161,8 @@ export default function App() {
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px' }}>
         {loading && (
           <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
-            <div style={{ fontSize: 15, marginBottom: 8 }}>Loading {ticker}...</div>
-            <div style={{ fontSize: 12 }}>Fetching price data, indicators & news</div>
+            <div style={{ fontSize: 15, marginBottom: 8, color: '#6b7280' }}>Loading {ticker}...</div>
+            <div style={{ fontSize: 12, color: '#9ca3af' }}>Fetching price data, indicators & news</div>
           </div>
         )}
 
@@ -251,10 +251,10 @@ export default function App() {
             }}>
               <span style={{ fontSize: 30 }}>📈</span>
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#e2e8f0', marginBottom: 10, letterSpacing: '-0.4px' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#111827', marginBottom: 10, letterSpacing: '-0.4px' }}>
               Welcome to QuantAnalyzer
             </div>
-            <div style={{ fontSize: 14, color: '#64748b', marginBottom: 44, maxWidth: 460, margin: '0 auto 44px' }}>
+            <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 44, maxWidth: 460, margin: '0 auto 44px' }}>
               Search any stock or ETF in the bar above to get real-time data,
               technical analysis, SMC signals, and AI-powered trade decisions.
             </div>
@@ -270,17 +270,17 @@ export default function App() {
                 { icon: '📊', title: 'Quant Strategy', desc: 'MA200 + RSI pullback system with full backtesting metrics' },
               ].map(f => (
                 <div key={f.title} style={{
-                  background: '#0f1628', border: '1px solid #1e2d4a',
+                  background: '#ffffff', border: '1px solid #e5e7eb',
                   borderRadius: 12, padding: '18px 16px', textAlign: 'left',
                   transition: 'border-color 0.2s',
                 }}>
                   <div style={{ fontSize: 22, marginBottom: 8 }}>{f.icon}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 5 }}>{f.title}</div>
-                  <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>{f.desc}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 5 }}>{f.title}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>{f.desc}</div>
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 36, fontSize: 12, color: '#334155' }}>
+            <div style={{ marginTop: 36, fontSize: 12, color: '#9ca3af' }}>
               Try searching: AAPL · TSLA · NVDA · SPY · BTC-USD
             </div>
           </div>
