@@ -7,25 +7,25 @@ interface Props {
 }
 
 const C = {
-  buy:     '#10b981',
-  sell:    '#ef4444',
-  hold:    '#f59e0b',
-  bull:    '#10b981',
-  bear:    '#ef4444',
-  muted:   '#64748b',
-  dim:     '#475569',
-  text:    '#e2e8f0',
-  subtext: '#94a3b8',
-  card:    '#0f1628',
-  border:  '#1e2d4a',
-  blue:    '#60a5fa',
+  buy:     '#059669',
+  sell:    '#dc2626',
+  hold:    '#d97706',
+  bull:    '#059669',
+  bear:    '#dc2626',
+  muted:   '#9ca3af',
+  dim:     '#9ca3af',
+  text:    '#111827',
+  subtext: '#6b7280',
+  card:    '#f8fafc',
+  border:  '#e5e7eb',
+  blue:    '#2563eb',
 };
 
 const signalColor = (s: string) =>
   s === 'BUY' ? C.buy : s === 'SELL' ? C.sell : C.hold;
 
 const signalBg = (s: string) =>
-  s === 'BUY' ? '#10b98118' : s === 'SELL' ? '#ef444418' : '#f59e0b18';
+  s === 'BUY' ? 'rgba(5,150,105,0.08)' : s === 'SELL' ? 'rgba(220,38,38,0.08)' : 'rgba(217,119,6,0.08)';
 
 function StatBox({
   label, value, color = C.text, sub,
@@ -50,8 +50,8 @@ function RunBtn({ onClick, loading }: { onClick?: () => void; loading: boolean }
       onClick={onClick}
       disabled={loading}
       style={{
-        background: loading ? C.card : '#1e3a5f',
-        border: `1px solid ${loading ? C.border : '#3b82f655'}`,
+        background: loading ? C.card : 'rgba(37,99,235,0.08)',
+        border: `1px solid ${loading ? C.border : 'rgba(37,99,235,0.3)'}`,
         borderRadius: 6, color: loading ? C.dim : C.blue,
         cursor: loading ? 'not-allowed' : 'pointer',
         fontSize: 11, fontWeight: 700, padding: '4px 11px',
@@ -223,8 +223,8 @@ export default function QuantStrategyPanel({ data, loading, onRun }: Props) {
           {/* Alt exit note */}
           <div style={{
             padding: '7px 12px', borderRadius: 7, marginBottom: 14,
-            background: '#f59e0b0a', border: '1px solid #f59e0b22',
-            fontSize: 11, color: '#fbbf24',
+            background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.2)',
+            fontSize: 11, color: '#d97706',
           }}>
             <span style={{ fontWeight: 700 }}>Alt exit (Option B):</span> Close when RSI returns to 50
             {' '}(currently {ind.rsi.toFixed(1)})
@@ -233,7 +233,7 @@ export default function QuantStrategyPanel({ data, loading, onRun }: Props) {
       ) : (
         <div style={{
           padding: '14px 12px', borderRadius: 8, marginBottom: 14, textAlign: 'center',
-          background: '#1e2d4a20', border: `1px solid ${C.border}`,
+          background: '#f3f4f6', border: `1px solid ${C.border}`,
         }}>
           <div style={{ fontSize: 12, color: C.muted }}>
             {ind.trend === 'bullish'

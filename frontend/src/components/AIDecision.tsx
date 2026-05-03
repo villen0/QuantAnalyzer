@@ -10,20 +10,20 @@ interface Props {
 }
 
 const DECISION_CONFIG: Record<Decision, { bg: string; border: string; text: string; glow: string; icon: any; label: string }> = {
-  'STRONG BUY': { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.5)', text: '#10b981', glow: 'rgba(16,185,129,0.3)', icon: TrendingUp, label: 'STRONG BUY' },
-  'BUY':         { bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.4)', text: '#34d399', glow: 'rgba(52,211,153,0.2)', icon: TrendingUp, label: 'BUY' },
-  'HOLD':        { bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.4)', text: '#f59e0b', glow: 'rgba(245,158,11,0.2)', icon: Minus,      label: 'HOLD' },
-  'SELL':        { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.4)', text: '#ef4444',  glow: 'rgba(239,68,68,0.2)', icon: TrendingDown, label: 'SELL' },
-  'STRONG SELL': { bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.6)', text: '#ef4444',  glow: 'rgba(239,68,68,0.35)', icon: TrendingDown, label: 'STRONG SELL' },
+  'STRONG BUY': { bg: 'rgba(5,150,105,0.08)',  border: 'rgba(5,150,105,0.35)',  text: '#059669', glow: 'rgba(5,150,105,0.12)',  icon: TrendingUp,   label: 'STRONG BUY' },
+  'BUY':        { bg: 'rgba(5,150,105,0.06)',  border: 'rgba(5,150,105,0.3)',   text: '#059669', glow: 'rgba(5,150,105,0.08)',  icon: TrendingUp,   label: 'BUY' },
+  'HOLD':       { bg: 'rgba(217,119,6,0.07)',  border: 'rgba(217,119,6,0.3)',   text: '#d97706', glow: 'rgba(217,119,6,0.1)',   icon: Minus,        label: 'HOLD' },
+  'SELL':       { bg: 'rgba(220,38,38,0.06)',  border: 'rgba(220,38,38,0.3)',   text: '#dc2626', glow: 'rgba(220,38,38,0.08)',  icon: TrendingDown, label: 'SELL' },
+  'STRONG SELL':{ bg: 'rgba(220,38,38,0.09)',  border: 'rgba(220,38,38,0.45)', text: '#dc2626', glow: 'rgba(220,38,38,0.12)',  icon: TrendingDown, label: 'STRONG SELL' },
 };
 
 const trendIcon = (t: string) => {
-  if (t === 'bullish') return <span style={{ color: '#10b981', fontSize: 11, fontWeight: 700 }}>▲ Bullish</span>;
-  if (t === 'bearish') return <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>▼ Bearish</span>;
-  return <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>→ Neutral</span>;
+  if (t === 'bullish') return <span style={{ color: '#059669', fontSize: 11, fontWeight: 700 }}>▲ Bullish</span>;
+  if (t === 'bearish') return <span style={{ color: '#dc2626', fontSize: 11, fontWeight: 700 }}>▼ Bearish</span>;
+  return <span style={{ color: '#6b7280', fontSize: 11, fontWeight: 700 }}>→ Neutral</span>;
 };
 
-const sentimentColor = (s: string) => ({ bullish: '#10b981', bearish: '#ef4444', neutral: '#94a3b8', mixed: '#f59e0b' }[s] || '#94a3b8');
+const sentimentColor = (s: string) => ({ bullish: '#10b981', bearish: '#ef4444', neutral: '#6b7280', mixed: '#f59e0b' }[s] || '#6b7280');
 
 export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
   const [apiKey, setApiKey] = useState(localStorage.getItem('groq_key') || '');
@@ -58,7 +58,7 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
               />
               <button
                 onClick={() => setShowKeyInput(false)}
-                style={{ background: '#1e2d4a', border: '1px solid #2d4060', color: '#94a3b8', borderRadius: 6, padding: '0 12px', fontSize: 12 }}
+                style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, padding: '0 12px', fontSize: 12 }}
               >
                 Done
               </button>
@@ -67,8 +67,8 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
             <button
               onClick={() => setShowKeyInput(true)}
               style={{
-                width: '100%', background: 'rgba(139,92,246,0.08)', border: '1px dashed rgba(139,92,246,0.3)',
-                color: '#a78bfa', borderRadius: 8, padding: '8px 12px', fontSize: 12,
+                width: '100%', background: 'rgba(124,58,237,0.06)', border: '1px dashed rgba(124,58,237,0.25)',
+                color: '#7c3aed', borderRadius: 8, padding: '8px 12px', fontSize: 12,
                 marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
@@ -81,7 +81,7 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
       {/* Analyze button */}
       {!analysis ? (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ marginBottom: 16, color: '#64748b', fontSize: 13 }}>
+          <div style={{ marginBottom: 16, color: '#6b7280', fontSize: 13 }}>
             AI will analyze technical indicators, fundamentals,<br />
             news sentiment, and multi-framework signals.
           </div>
@@ -89,7 +89,7 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
             onClick={handleAnalyze}
             disabled={analyzing}
             style={{
-              background: analyzing ? '#1e2d4a' : 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+              background: analyzing ? '#e5e7eb' : 'linear-gradient(135deg, #7c3aed, #5b21b6)',
               color: 'white', border: 'none', borderRadius: 10,
               padding: '12px 28px', fontSize: 15, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto',
@@ -98,7 +98,7 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
           >
             {analyzing ? <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> Analyzing...</> : <><Brain size={16} /> Run AI Analysis</>}
           </button>
-          <div style={{ marginTop: 12, fontSize: 11, color: '#475569' }}>
+          <div style={{ marginTop: 12, fontSize: 11, color: '#9ca3af' }}>
             Without API key: uses rule-based technical analysis
           </div>
         </div>
@@ -122,12 +122,12 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
                   </span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>Confidence</div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>Confidence</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: cfg.text }}>{analysis.confidence}%</div>
                 </div>
               </div>
               {/* Confidence bar */}
-              <div style={{ height: 4, background: '#1e2d4a', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${analysis.confidence}%`, background: cfg.text, borderRadius: 2, transition: 'width 0.5s ease' }} />
               </div>
             </div>
@@ -140,8 +140,8 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
               { icon: <Shield size={13} color="#ef4444" />, label: 'Stop Loss', value: analysis.stop_loss ? `$${analysis.stop_loss.toFixed(2)}` : 'N/A', color: '#ef4444' },
               { icon: <TrendingUp size={13} color="#10b981" />, label: 'Target', value: analysis.profit_target ? `$${analysis.profit_target.toFixed(2)}` : 'N/A', color: '#10b981' },
             ].map(({ icon, label, value, color }) => (
-              <div key={label} style={{ background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 4 }}>{icon}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span></div>
+              <div key={label} style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 4 }}>{icon}<span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span></div>
                 <div style={{ fontSize: 15, fontWeight: 700, color }}>{value}</div>
               </div>
             ))}
@@ -149,75 +149,75 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
 
           {/* Risk/Reward + Horizon */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <div style={{ background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8, padding: '8px 12px' }}>
-              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Risk:Reward</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>
+            <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Risk:Reward</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
                 {analysis.risk_reward_ratio ? `1 : ${analysis.risk_reward_ratio.toFixed(2)}` : 'N/A'}
               </div>
             </div>
-            <div style={{ background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8, padding: '8px 12px' }}>
-              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Time Horizon</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{analysis.time_horizon}</div>
+            <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Time Horizon</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{analysis.time_horizon}</div>
             </div>
           </div>
 
           {/* Trend */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 14, padding: '10px 12px', background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8 }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 14, padding: '10px 12px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8 }}>
             <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 9, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Daily</div>
+              <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Daily</div>
               {trendIcon(analysis.trend.daily)}
             </div>
-            <div style={{ width: 1, background: '#1e2d4a' }} />
+            <div style={{ width: 1, background: '#e5e7eb' }} />
             <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 9, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Weekly</div>
+              <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Weekly</div>
               {trendIcon(analysis.trend.weekly)}
             </div>
-            <div style={{ width: 1, background: '#1e2d4a' }} />
+            <div style={{ width: 1, background: '#e5e7eb' }} />
             <div style={{ textAlign: 'center', flex: 1 }}>
-              <div style={{ fontSize: 9, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Overall</div>
+              <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Overall</div>
               {trendIcon(analysis.trend.overall)}
             </div>
           </div>
 
           {/* Key Levels */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '8px 12px' }}>
-              <div style={{ fontSize: 10, color: '#10b981', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Must Hold Support</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#10b981' }}>${analysis.key_levels?.must_hold?.toFixed(2) ?? 'N/A'}</div>
+            <div style={{ background: 'rgba(5,150,105,0.06)', border: '1px solid rgba(5,150,105,0.2)', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, color: '#059669', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Must Hold Support</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#059669' }}>${analysis.key_levels?.must_hold?.toFixed(2) ?? 'N/A'}</div>
             </div>
-            <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>
-              <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Breakout Target</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>${analysis.key_levels?.breakout_target?.toFixed(2) ?? 'N/A'}</div>
+            <div style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Breakout Target</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#dc2626' }}>${analysis.key_levels?.breakout_target?.toFixed(2) ?? 'N/A'}</div>
             </div>
           </div>
 
           {/* Reasoning */}
-          <div style={{ background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>AI Reasoning</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.7 }}>{analysis.reasoning}</div>
+          <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>AI Reasoning</div>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.7 }}>{analysis.reasoning}</div>
           </div>
 
           {/* Technical summary */}
-          <div style={{ background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Technical Summary</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.7 }}>{analysis.technical_summary}</div>
+          <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Technical Summary</div>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.7 }}>{analysis.technical_summary}</div>
           </div>
 
           {/* Fundamental summary */}
-          <div style={{ background: '#0f1628', border: '1px solid #1e2d4a', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Fundamental Summary</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.7 }}>{analysis.fundamental_summary}</div>
+          <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Fundamental Summary</div>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.7 }}>{analysis.fundamental_summary}</div>
           </div>
 
           {/* Catalysts */}
           {analysis.catalysts?.length > 0 && (
             <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Catalysts</div>
+              <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Catalysts</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {analysis.catalysts.map((c, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <Zap size={11} color="#f59e0b" style={{ marginTop: 2, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{c}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{c}</span>
                   </div>
                 ))}
               </div>
@@ -227,12 +227,12 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
           {/* Risk Factors */}
           {analysis.risk_factors?.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Risk Factors</div>
+              <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Risk Factors</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {analysis.risk_factors.map((r, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <AlertTriangle size={11} color="#ef4444" style={{ marginTop: 2, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{r}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{r}</span>
                   </div>
                 ))}
               </div>
@@ -241,21 +241,21 @@ export default function AIDecision({ analysis, onAnalyze, analyzing }: Props) {
 
           {/* News sentiment */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>News Sentiment:</div>
+            <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>News Sentiment:</div>
             <span style={{ fontSize: 12, fontWeight: 700, color: sentimentColor(analysis.news_sentiment), textTransform: 'uppercase' }}>
               {analysis.news_sentiment}
             </span>
           </div>
 
           {/* Source + Re-analyze */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid #1e2d4a' }}>
-            <span style={{ fontSize: 10, color: '#475569' }}>Source: {analysis.source}</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid #e5e7eb' }}>
+            <span style={{ fontSize: 10, color: '#9ca3af' }}>Source: {analysis.source}</span>
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
               style={{
-                background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)',
-                color: '#a78bfa', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600,
+                background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.22)',
+                color: '#7c3aed', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600,
                 display: 'flex', alignItems: 'center', gap: 5,
               }}
             >

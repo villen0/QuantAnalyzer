@@ -44,12 +44,12 @@ const CustomTooltip = ({ active, payload }: any) => {
 
   return (
     <div style={{
-      background: '#0f1628', border: '1px solid #1e3a5f', borderRadius: 10,
-      padding: '12px 16px', fontSize: 12, color: '#e2e8f0',
-      boxShadow: '0 8px 24px rgba(0,0,0,0.5)', minWidth: 190,
+      background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10,
+      padding: '12px 16px', fontSize: 12, color: '#111827',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: 190,
     }}>
       {/* Date */}
-      <div style={{ fontSize: 11, color: '#475569', marginBottom: 6, letterSpacing: '0.02em' }}>
+      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6, letterSpacing: '0.02em' }}>
         {dateStr}
       </div>
 
@@ -66,25 +66,25 @@ const CustomTooltip = ({ active, payload }: any) => {
       {/* OHLC grid */}
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px',
-        paddingTop: 8, borderTop: '1px solid #1e2d4a', marginBottom: 8,
+        paddingTop: 8, borderTop: '1px solid #e5e7eb', marginBottom: 8,
       }}>
         {[
-          { label: 'Open',  value: d.open,  color: '#94a3b8' },
+          { label: 'Open',  value: d.open,  color: '#6b7280' },
           { label: 'High',  value: d.high,  color: '#10b981' },
           { label: 'Low',   value: d.low,   color: '#ef4444' },
-          { label: 'Close', value: d.close, color: '#e2e8f0' },
+          { label: 'Close', value: d.close, color: '#111827' },
         ].map(({ label, value, color }) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-            <span style={{ color: '#475569', fontSize: 11 }}>{label}</span>
+            <span style={{ color: '#9ca3af', fontSize: 11 }}>{label}</span>
             <span style={{ color, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${value.toFixed(2)}</span>
           </div>
         ))}
       </div>
 
       {/* Volume */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid #1e2d4a' }}>
-        <span style={{ color: '#475569', fontSize: 11 }}>Vol</span>
-        <span style={{ color: '#60a5fa', fontWeight: 600, fontSize: 11 }}>{vol}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid #e5e7eb' }}>
+        <span style={{ color: '#9ca3af', fontSize: 11 }}>Vol</span>
+        <span style={{ color: '#2563eb', fontWeight: 600, fontSize: 11 }}>{vol}</span>
       </div>
     </div>
   );
@@ -171,8 +171,8 @@ function ToggleBtn({
     <button onClick={onClick} style={{
       fontSize: 11, padding: '3px 8px', borderRadius: 5, fontWeight: 600,
       background: active ? `${color}22` : 'transparent',
-      color:      active ? color         : '#64748b',
-      border:     `1px solid ${active ? `${color}44` : '#1e2d4a'}`,
+      color:      active ? color         : '#9ca3af',
+      border:     `1px solid ${active ? `${color}44` : '#e5e7eb'}`,
     }}>
       {label}
     </button>
@@ -221,7 +221,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       {/* ── Row 1: title + overlays ─── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 20px 10px', borderBottom: '1px solid #1e2d4a', flexWrap: 'wrap', gap: 8,
+        padding: '14px 20px 10px', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="card-header" style={{ marginBottom: 0 }}>Price Chart</span>
@@ -233,7 +233,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       {/* ── Row 2: chart type + zoom ─── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 20px', borderBottom: '1px solid #1e2d4a',
+        padding: '8px 20px', borderBottom: '1px solid #e5e7eb',
       }}>
         {/* Chart type */}
         <div style={{ display: 'flex', gap: 4 }}>
@@ -241,8 +241,8 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
             <button key={type} onClick={() => setChartType(type)} style={{
               fontSize: 11, padding: '4px 12px', borderRadius: 6, fontWeight: 600,
               background: chartType === type ? 'rgba(59,130,246,0.15)' : 'transparent',
-              color:      chartType === type ? '#60a5fa'                : '#64748b',
-              border:     `1px solid ${chartType === type ? 'rgba(59,130,246,0.4)' : '#1e2d4a'}`,
+              color:      chartType === type ? '#2563eb'                : '#9ca3af',
+              border:     `1px solid ${chartType === type ? 'rgba(59,130,246,0.4)' : '#e5e7eb'}`,
             }}>
               {type === 'candle' ? '🕯 Candlestick' : '📈 Line'}
             </button>
@@ -251,35 +251,35 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
 
         {/* Zoom controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zoom</span>
+          <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zoom</span>
           <button onClick={zoomOut} disabled={!canZoomOut} style={{
             width: 26, height: 26, borderRadius: 6, fontWeight: 700, fontSize: 14,
-            background: canZoomOut ? '#1e2d4a' : 'transparent',
-            color: canZoomOut ? '#94a3b8' : '#334155',
-            border: '1px solid #1e2d4a',
+            background: canZoomOut ? '#e5e7eb' : 'transparent',
+            color: canZoomOut ? '#6b7280' : '#d1d5db',
+            border: '1px solid #e5e7eb',
           }}>−</button>
           <span style={{
-            fontSize: 11, fontWeight: 700, color: '#60a5fa',
+            fontSize: 11, fontWeight: 700, color: '#2563eb',
             minWidth: 44, textAlign: 'center',
           }}>
             {zoomPct}%
           </span>
           <button onClick={zoomIn} disabled={!canZoomIn} style={{
             width: 26, height: 26, borderRadius: 6, fontWeight: 700, fontSize: 14,
-            background: canZoomIn ? '#1e2d4a' : 'transparent',
-            color: canZoomIn ? '#94a3b8' : '#334155',
-            border: '1px solid #1e2d4a',
+            background: canZoomIn ? '#e5e7eb' : 'transparent',
+            color: canZoomIn ? '#6b7280' : '#d1d5db',
+            border: '1px solid #e5e7eb',
           }}>+</button>
           {visibleBars && (
             <button onClick={() => setVisibleBars(null)} style={{
               fontSize: 10, padding: '3px 8px', borderRadius: 5, fontWeight: 600,
-              background: 'transparent', color: '#475569',
-              border: '1px solid #1e2d4a',
+              background: 'transparent', color: '#9ca3af',
+              border: '1px solid #e5e7eb',
             }}>
               Reset
             </button>
           )}
-          <span style={{ fontSize: 10, color: '#334155' }}>{shown} bars</span>
+          <span style={{ fontSize: 10, color: '#d1d5db' }}>{shown} bars</span>
         </div>
       </div>
 
@@ -287,7 +287,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       <div style={{ padding: '16px 4px 0' }}>
         <ResponsiveContainer width="100%" height={320}>
           <ComposedChart data={displayData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }} barCategoryGap={0}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e2d4a" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={v => {
@@ -298,14 +298,14 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
                 if (period === '5y' || period === 'max') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                 return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
               }}
-              tick={{ fontSize: 10, fill: '#64748b' }}
+              tick={{ fontSize: 10, fill: '#9ca3af' }}
               tickLine={false} axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
               domain={[priceMin, priceMax]}
               tickFormatter={v => `$${v.toFixed(0)}`}
-              tick={{ fontSize: 10, fill: '#64748b' }}
+              tick={{ fontSize: 10, fill: '#9ca3af' }}
               tickLine={false} axisLine={false} width={60}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -357,7 +357,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
         <ResponsiveContainer width="100%" height={80}>
           <ComposedChart data={displayData} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
             <XAxis dataKey="date" hide />
-            <YAxis tickFormatter={v => `${(v / 1e6).toFixed(0)}M`} tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} axisLine={false} width={60} />
+            <YAxis tickFormatter={v => `${(v / 1e6).toFixed(0)}M`} tick={{ fontSize: 9, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={60} />
             <Bar dataKey="volume" fill="#3b82f6" opacity={0.4} maxBarSize={8} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
@@ -367,7 +367,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       {showSMA && (
         <div style={{ display: 'flex', gap: 16, padding: '8px 20px 4px', flexWrap: 'wrap' }}>
           {[
-            { color: '#e2e8f0', label: 'Price' },
+            { color: '#111827', label: 'Price' },
             { color: '#f59e0b', label: `SMA20 $${indicators.sma20?.toFixed(2) ?? 'N/A'}` },
             { color: '#3b82f6', label: `SMA50 $${indicators.sma50?.toFixed(2) ?? 'N/A'}` },
             { color: '#8b5cf6', label: `SMA200 $${indicators.sma200?.toFixed(2) ?? 'N/A'}` },
@@ -375,7 +375,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
           ].filter(Boolean).map((item: any) => (
             <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 20, height: 2, background: item.color, borderRadius: 1 }} />
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>{item.label}</span>
+              <span style={{ fontSize: 11, color: '#6b7280' }}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -384,7 +384,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       {/* ── Robinhood-style period selector ─── */}
       <div style={{
         display: 'flex', justifyContent: 'center', gap: 2,
-        padding: '10px 20px 14px', borderTop: '1px solid #1e2d4a',
+        padding: '10px 20px 14px', borderTop: '1px solid #e5e7eb',
       }}>
         {PERIOD_BUTTONS.map(btn => {
           const active = btn.api === period;
@@ -394,9 +394,9 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
               onClick={() => onPeriodChange(btn.api)}
               style={{
                 fontSize: 12, padding: '5px 14px', borderRadius: 6, fontWeight: 700,
-                background: active ? 'rgba(245,158,11,0.12)' : 'transparent',
-                color:      active ? '#f59e0b'                : '#475569',
-                border:     `1px solid ${active ? 'rgba(245,158,11,0.35)' : 'transparent'}`,
+                background: active ? 'rgba(217,119,6,0.1)' : 'transparent',
+                color:      active ? '#d97706'                : '#6b7280',
+                border:     `1px solid ${active ? 'rgba(217,119,6,0.3)' : 'transparent'}`,
                 transition: 'all 0.15s',
                 letterSpacing: '0.02em',
               }}
