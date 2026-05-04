@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -23,72 +23,39 @@ const PERIOD_BUTTONS = [
   { label: 'MAX', api: 'max' },
 ];
 
-// ── Tooltip ──────────────────────────────────────────────────────────────────
+// ── Fixed info bar (shown above chart, updates on hover) ─────────────────────
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  if (!d) return null;
-
-  const isUp = d.close >= d.open;
-  const priceColor = isUp ? '#10b981' : '#ef4444';
-  const change = d.close - d.open;
-  const changePct = d.open > 0 ? (change / d.open) * 100 : 0;
-  const vol = d.volume >= 1e9
-    ? `${(d.volume / 1e9).toFixed(2)}B`
-    : `${(d.volume / 1e6).toFixed(2)}M`;
-
-  const dateStr = d.date?.includes(' ')
-    ? d.date.replace('T', ' ').slice(0, 16) + ' ET'
-    : d.date?.slice(0, 10);
+function InfoBar({ bar, period }: { bar: any; period: string }) {
+  if (!bar) return <div style={{ height: 28 }} />;
+  const isUp = bar.close >= bar.open;
+  const change = bar.close - bar.open;
+  const changePct = bar.open > 0 ? (change / bar.open) * 100 : 0;
+  const col = isUp ? '#059669' : '#dc2626';
+  const vol = bar.volume >= 1e9
+    ? `${(bar.volume / 1e9).toFixed(2)}B`
+    : `${(bar.volume / 1e6).toFixed(2)}M`;
+  const dateStr = bar.date?.includes(' ')
+    ? bar.date.slice(0, 16) + ' ET'
+    : bar.date?.slice(0, 10);
 
   return (
     <div style={{
-      background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10,
-      padding: '12px 16px', fontSize: 12, color: '#111827',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: 190,
+      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 14px',
+      padding: '5px 20px', borderBottom: '1px solid #f3f4f6',
+      fontSize: 11, background: '#fafafa',
     }}>
-      {/* Date */}
-      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6, letterSpacing: '0.02em' }}>
-        {dateStr}
-      </div>
-
-      {/* Close price + change */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 20, fontWeight: 800, color: priceColor, letterSpacing: '-0.5px' }}>
-          ${d.close.toFixed(2)}
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: priceColor }}>
-          {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)} ({Math.abs(changePct).toFixed(2)}%)
-        </span>
-      </div>
-
-      {/* OHLC grid */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px',
-        paddingTop: 8, borderTop: '1px solid #e5e7eb', marginBottom: 8,
-      }}>
-        {[
-          { label: 'Open',  value: d.open,  color: '#6b7280' },
-          { label: 'High',  value: d.high,  color: '#10b981' },
-          { label: 'Low',   value: d.low,   color: '#ef4444' },
-          { label: 'Close', value: d.close, color: '#111827' },
-        ].map(({ label, value, color }) => (
-          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-            <span style={{ color: '#9ca3af', fontSize: 11 }}>{label}</span>
-            <span style={{ color, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${value.toFixed(2)}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Volume */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid #e5e7eb' }}>
-        <span style={{ color: '#9ca3af', fontSize: 11 }}>Vol</span>
-        <span style={{ color: '#2563eb', fontWeight: 600, fontSize: 11 }}>{vol}</span>
-      </div>
+      <span style={{ color: '#9ca3af', fontWeight: 500 }}>{dateStr}</span>
+      <span style={{ color: '#6b7280' }}>O <b style={{ color: '#111827' }}>${bar.open.toFixed(2)}</b></span>
+      <span style={{ color: '#6b7280' }}>H <b style={{ color: '#059669' }}>${bar.high.toFixed(2)}</b></span>
+      <span style={{ color: '#6b7280' }}>L <b style={{ color: '#dc2626' }}>${bar.low.toFixed(2)}</b></span>
+      <span style={{ color: '#6b7280' }}>C <b style={{ color: col }}>${bar.close.toFixed(2)}</b></span>
+      <span style={{ color: col, fontWeight: 700 }}>
+        {isUp ? '▲' : '▼'} {Math.abs(changePct).toFixed(2)}%
+      </span>
+      <span style={{ color: '#9ca3af' }}>Vol <b style={{ color: '#6b7280' }}>{vol}</b></span>
     </div>
   );
-};
+}
 
 // ── Indicators overlay ────────────────────────────────────────────────────────
 
@@ -185,10 +152,16 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
   const [showBB,    setShowBB]    = useState(true);
   const [showSMA,   setShowSMA]   = useState(true);
   const [chartType, setChartType] = useState<'candle' | 'line'>('candle');
-  const [visibleBars, setVisibleBars] = useState<number | null>(null); // null = all
+  const [visibleBars, setVisibleBars] = useState<number | null>(null);
+  const [hoveredBar, setHoveredBar] = useState<any>(null);
 
   // Reset zoom when new data loads (ticker or period changed)
   useEffect(() => { setVisibleBars(null); }, [data]);
+
+  const handleMouseMove = useCallback((e: any) => {
+    if (e?.activePayload?.[0]?.payload) setHoveredBar(e.activePayload[0].payload);
+  }, []);
+  const handleMouseLeave = useCallback(() => setHoveredBar(null), []);
 
   // Build full enriched dataset
   const enriched   = addBB(addMAs(data, [20, 50, 200]));
@@ -283,10 +256,19 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
         </div>
       </div>
 
+      {/* ── Fixed info bar ─── */}
+      <InfoBar bar={hoveredBar ?? displayData[displayData.length - 1]} period={period} />
+
       {/* ── Price chart ─── */}
-      <div style={{ padding: '16px 4px 0' }}>
+      <div style={{ padding: '8px 4px 0' }}>
         <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart data={displayData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }} barCategoryGap={0}>
+          <ComposedChart
+            data={displayData}
+            margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
+            barCategoryGap={0}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
             <XAxis
               dataKey="date"
@@ -308,7 +290,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
               tick={{ fontSize: 10, fill: '#9ca3af' }}
               tickLine={false} axisLine={false} width={60}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={() => null} cursor={{ stroke: '#9ca3af', strokeWidth: 1, strokeDasharray: '4 4' }} />
 
             {/* Bollinger Bands */}
             {showBB && <>
@@ -336,7 +318,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
             {/* Close line (line mode) */}
             {chartType === 'line' && (
               <Line
-                dataKey="close" stroke="#e2e8f0" strokeWidth={2}
+                dataKey="close" stroke="#2563eb" strokeWidth={2}
                 dot={false} legendType="none"
               />
             )}
@@ -367,7 +349,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       {showSMA && (
         <div style={{ display: 'flex', gap: 16, padding: '8px 20px 4px', flexWrap: 'wrap' }}>
           {[
-            { color: '#111827', label: 'Price' },
+            { color: '#2563eb', label: 'Price' },
             { color: '#f59e0b', label: `SMA20 $${indicators.sma20?.toFixed(2) ?? 'N/A'}` },
             { color: '#3b82f6', label: `SMA50 $${indicators.sma50?.toFixed(2) ?? 'N/A'}` },
             { color: '#8b5cf6', label: `SMA200 $${indicators.sma200?.toFixed(2) ?? 'N/A'}` },
