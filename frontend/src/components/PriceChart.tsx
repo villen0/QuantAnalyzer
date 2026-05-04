@@ -108,11 +108,17 @@ function enrich(data: OHLCVBar[]): any[] {
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 
-function toChartTime(dateStr: string, intraday: boolean): number | string {
-  if (intraday && dateStr.includes(' ')) {
+// Always return a UTCTimestamp (number) so param.time in crosshair callbacks is
+// always a number — string dates get converted to BusinessDay objects by
+// lightweight-charts, making String(param.time) === "[object Object]" and
+// breaking the map lookup.
+function toChartTime(dateStr: string): number {
+  if (dateStr.includes(' ')) {
+    // Intraday: "2024-01-01 09:30:00" — parse as local time (matches display)
     return Math.floor(new Date(dateStr.replace(' ', 'T')).getTime() / 1000);
   }
-  return dateStr.slice(0, 10);
+  // Daily: use noon UTC to keep the displayed date correct in all timezones
+  return Math.floor(new Date(dateStr.slice(0, 10) + 'T12:00:00Z').getTime() / 1000);
 }
 
 // ── Pill toggle ───────────────────────────────────────────────────────────────
@@ -240,8 +246,8 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
 
     seriesRef.current = { candle, volume, sma20, sma50, sma200, bbUpper, bbLower, bbMid };
 
-    // Feed data
-    const t = (d: string) => toChartTime(d, isIntraday);
+    // Feed data — toChartTime always returns a number (UTCTimestamp)
+    const t = (d: string) => toChartTime(d);
 
     candle.setData(enrichedData.map(d => ({
       time: t(d.date) as any,
@@ -271,22 +277,17 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
     chart.timeScale().fitContent();
 
     // Crosshair → OHLCV card
-    const timeToBar = new Map<string, any>(enrichedData.map(d => [String(t(d.date)), d]));
+    // Key is the UTCTimestamp number — param.time is always a number since we
+    // never provide string dates (which would come back as BusinessDay objects).
+    const timeToBar = new Map<number, any>(enrichedData.map(d => [t(d.date), d]));
 
     chart.subscribeCrosshairMove(param => {
-      if (!param.point || !param.time) {
+      if (!param.point || param.time == null) {
         if (lastBar) cardRef.current?.update(lastBar);
         return;
       }
-      const hit  = param.seriesData.get(candle) as any;
-      const orig = timeToBar.get(String(param.time));
-      if (hit && orig) {
-        cardRef.current?.update({
-          open: hit.open, high: hit.high, low: hit.low, close: hit.close,
-          volume: orig.volume,
-          date:   orig.date,
-        });
-      }
+      const orig = timeToBar.get(param.time as number);
+      if (orig) cardRef.current?.update(orig);
     });
 
     // Responsive resize
