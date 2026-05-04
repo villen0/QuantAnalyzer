@@ -1,8 +1,9 @@
-import { useState, useCallback, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
+import { useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
-} from 'recharts';
+  createChart, ColorType, CrosshairMode, LineStyle,
+  CandlestickSeries, LineSeries, HistogramSeries,
+  type IChartApi, type ISeriesApi, type SeriesType,
+} from 'lightweight-charts';
 import type { OHLCVBar, Indicators } from '../types';
 
 interface Props {
@@ -23,7 +24,7 @@ const PERIODS = [
   { label: 'MAX', api: 'max' },
 ];
 
-// ── OHLCV card — pinned top-left, isolated renders via imperative ref ─────────
+// ── OHLCV card — pinned top-left, isolated renders via imperative ref ──────────
 
 interface CardHandle { update: (bar: any) => void }
 
@@ -82,7 +83,7 @@ const OHLCVCard = forwardRef<CardHandle, { initial: any }>(({ initial }, ref) =>
   );
 });
 
-// ── Data helpers (defined outside component — never recreated) ────────────────
+// ── Data enrichment ───────────────────────────────────────────────────────────
 
 function enrich(data: OHLCVBar[]): any[] {
   return data.map((bar, i) => {
@@ -105,32 +106,14 @@ function enrich(data: OHLCVBar[]): any[] {
   });
 }
 
-// ── Candlestick shape (defined outside component — stable reference) ──────────
+// ── Time helpers ──────────────────────────────────────────────────────────────
 
-function CandleShape({ x, width, background, payload }: any) {
-  if (!payload || !background || background.height <= 0) return null;
-  const { open = 0, high = 0, low = 0, close = 0, priceMin, priceMax } = payload;
-  const range = priceMax - priceMin;
-  if (range <= 0) return null;
-
-  const isUp  = close >= open;
-  const color = isUp ? '#10b981' : '#ef4444';
-  const toY   = (p: number) => background.y + background.height * (1 - (p - priceMin) / range);
-  const bodyTop = Math.min(toY(open), toY(close));
-  const bodyH   = Math.max(Math.abs(toY(open) - toY(close)), 1);
-  const cw      = Math.max(width * 0.6, 1.5);
-  const cx      = x + width / 2;
-
-  return (
-    <g>
-      <line x1={cx} y1={toY(high)} x2={cx} y2={toY(low)} stroke={color} strokeWidth={1} />
-      <rect x={cx - cw / 2} y={bodyTop} width={cw} height={bodyH}
-        fill={isUp ? color : 'transparent'} stroke={color} strokeWidth={1} />
-    </g>
-  );
+function toChartTime(dateStr: string, intraday: boolean): number | string {
+  if (intraday && dateStr.includes(' ')) {
+    return Math.floor(new Date(dateStr.replace(' ', 'T')).getTime() / 1000);
+  }
+  return dateStr.slice(0, 10);
 }
-
-const CANDLE_SHAPE = <CandleShape />;
 
 // ── Pill toggle ───────────────────────────────────────────────────────────────
 
@@ -147,42 +130,194 @@ function Pill({ label, active, color, onClick }: { label: string; active: boolea
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+interface SeriesRefs {
+  candle:  ISeriesApi<'Candlestick'> | null;
+  volume:  ISeriesApi<'Histogram'>   | null;
+  sma20:   ISeriesApi<'Line'>        | null;
+  sma50:   ISeriesApi<'Line'>        | null;
+  sma200:  ISeriesApi<'Line'>        | null;
+  bbUpper: ISeriesApi<'Line'>        | null;
+  bbLower: ISeriesApi<'Line'>        | null;
+  bbMid:   ISeriesApi<'Line'>        | null;
+}
+
 export default function PriceChart({ data, indicators, period, onPeriodChange }: Props) {
   const [showBB,  setShowBB]  = useState(false);
   const [showSMA, setShowSMA] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef     = useRef<IChartApi | null>(null);
+  const seriesRef    = useRef<SeriesRefs>({
+    candle: null, volume: null,
+    sma20: null, sma50: null, sma200: null,
+    bbUpper: null, bbLower: null, bbMid: null,
+  });
   const cardRef = useRef<CardHandle>(null);
 
-  // All expensive work memoized — hover re-renders are cheap
-  const displayData = useMemo(() => {
-    const enriched = enrich(data);
-    const pMin = Math.min(...enriched.map(d => d.low))  * 0.99;
-    const pMax = Math.max(...enriched.map(d => d.high)) * 1.01;
-    return enriched.map(d => ({ ...d, priceMin: pMin, priceMax: pMax }));
-  }, [data]);
+  const enrichedData = useMemo(() => enrich(data), [data]);
+  const lastBar      = enrichedData[enrichedData.length - 1];
+  const isIntraday   = period === '1d' || period === '5d';
 
-  const priceMin = displayData[0]?.priceMin ?? 0;
-  const priceMax = displayData[0]?.priceMax ?? 1;
-  const lastBar  = displayData[displayData.length - 1];
+  // ── Build / rebuild chart on data or period change ────────────────────────
+  useEffect(() => {
+    if (!containerRef.current || !enrichedData.length) return;
 
-  const xFmt = useCallback((v: string) => {
-    if (!v) return '';
-    const d = new Date(v.replace(' ', 'T'));
-    if (period === '1d') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-    if (period === '5y' || period === 'max') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }, [period]);
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
 
-  // The hidden Line below gives Recharts a series to track for hover — Bar alone
-  // does not reliably populate activePayload with custom shapes.
-  const handleMouseMove = useCallback((e: any) => {
-    // Try all payload items until we find one with OHLC data
-    const hit = e?.activePayload?.find((p: any) => p?.payload?.open != null);
-    if (hit?.payload) cardRef.current?.update(hit.payload);
-  }, []);
+    const chart = createChart(containerRef.current, {
+      width:  containerRef.current.clientWidth,
+      height: 420,
+      layout: {
+        background: { type: ColorType.Solid, color: '#ffffff' },
+        textColor: '#9ca3af',
+        fontSize: 11,
+        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+      },
+      grid: {
+        vertLines: { visible: false },
+        horzLines: { color: '#f1f5f9' },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: '#d1d5db', labelBackgroundColor: '#374151' },
+        horzLine: { color: '#d1d5db', labelBackgroundColor: '#374151' },
+      },
+      rightPriceScale: {
+        borderColor: '#f1f5f9',
+        scaleMargins: { top: 0.05, bottom: 0.22 },
+      },
+      timeScale: {
+        borderColor: '#f1f5f9',
+        timeVisible: isIntraday,
+        secondsVisible: false,
+        rightOffset: 5,
+      },
+    });
+    chartRef.current = chart;
 
-  const handleMouseLeave = useCallback(() => {
-    if (lastBar) cardRef.current?.update(lastBar);
-  }, [lastBar]);
+    // Candlestick series
+    const candle = chart.addSeries(CandlestickSeries, {
+      upColor:       '#26a69a',
+      downColor:     '#ef5350',
+      borderVisible: false,
+      wickUpColor:   '#26a69a',
+      wickDownColor: '#ef5350',
+    });
+
+    // Volume histogram — bottom 20% via separate price scale
+    const volume = chart.addSeries(HistogramSeries, {
+      priceFormat:  { type: 'volume' },
+      priceScaleId: 'vol',
+    });
+    chart.priceScale('vol').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+      visible: false,
+    });
+
+    // MA overlay lines (hidden by default)
+    const mkLine = (color: string, width: 1 | 1.5 | 2 = 1.5) => chart.addSeries(LineSeries, {
+      color, lineWidth: width,
+      priceLineVisible: false, lastValueVisible: false,
+      crosshairMarkerVisible: false, visible: false,
+    });
+    const sma20  = mkLine('#f59e0b', 1);
+    const sma50  = mkLine('#3b82f6');
+    const sma200 = mkLine('#8b5cf6');
+
+    // Bollinger Bands (hidden by default)
+    const mkBB = (dashed = false) => chart.addSeries(LineSeries, {
+      color: '#10b981', lineWidth: 1,
+      lineStyle: dashed ? LineStyle.Dashed : LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false,
+      crosshairMarkerVisible: false, visible: false,
+    });
+    const bbUpper = mkBB();
+    const bbLower = mkBB();
+    const bbMid   = mkBB(true);
+
+    seriesRef.current = { candle, volume, sma20, sma50, sma200, bbUpper, bbLower, bbMid };
+
+    // Feed data
+    const t = (d: string) => toChartTime(d, isIntraday);
+
+    candle.setData(enrichedData.map(d => ({
+      time: t(d.date) as any,
+      open: d.open, high: d.high, low: d.low, close: d.close,
+    })));
+    volume.setData(enrichedData.map(d => ({
+      time:  t(d.date) as any,
+      value: d.volume,
+      color: d.close >= d.open ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+    })));
+
+    const lineData = (key: string) =>
+      enrichedData.filter(d => d[key] != null).map(d => ({ time: t(d.date) as any, value: d[key] }));
+
+    sma20.setData(lineData('sma20'));
+    sma50.setData(lineData('sma50'));
+    sma200.setData(lineData('sma200'));
+    bbUpper.setData(lineData('bb_upper'));
+    bbLower.setData(lineData('bb_lower'));
+    bbMid.setData(lineData('bb_mid'));
+
+    // Support / Resistance price lines
+    const sr = indicators.support_resistance;
+    if (sr?.r1) candle.createPriceLine({ price: sr.r1, color: '#ef4444', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'R1' });
+    if (sr?.s1) candle.createPriceLine({ price: sr.s1, color: '#10b981', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'S1' });
+
+    chart.timeScale().fitContent();
+
+    // Crosshair → OHLCV card
+    const timeToBar = new Map<string, any>(enrichedData.map(d => [String(t(d.date)), d]));
+
+    chart.subscribeCrosshairMove(param => {
+      if (!param.point || !param.time) {
+        if (lastBar) cardRef.current?.update(lastBar);
+        return;
+      }
+      const hit  = param.seriesData.get(candle) as any;
+      const orig = timeToBar.get(String(param.time));
+      if (hit && orig) {
+        cardRef.current?.update({
+          open: hit.open, high: hit.high, low: hit.low, close: hit.close,
+          volume: orig.volume,
+          date:   orig.date,
+        });
+      }
+    });
+
+    // Responsive resize
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
+      }
+    });
+    ro.observe(containerRef.current);
+
+    return () => {
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [enrichedData, period, indicators, isIntraday, lastBar]);
+
+  // ── Toggle overlays without rebuilding the chart ──────────────────────────
+  useEffect(() => {
+    const { sma20, sma50, sma200 } = seriesRef.current;
+    (sma20  as ISeriesApi<SeriesType> | null)?.applyOptions({ visible: showSMA });
+    (sma50  as ISeriesApi<SeriesType> | null)?.applyOptions({ visible: showSMA });
+    (sma200 as ISeriesApi<SeriesType> | null)?.applyOptions({ visible: showSMA });
+  }, [showSMA]);
+
+  useEffect(() => {
+    const { bbUpper, bbLower, bbMid } = seriesRef.current;
+    (bbUpper as ISeriesApi<SeriesType> | null)?.applyOptions({ visible: showBB });
+    (bbLower as ISeriesApi<SeriesType> | null)?.applyOptions({ visible: showBB });
+    (bbMid   as ISeriesApi<SeriesType> | null)?.applyOptions({ visible: showBB });
+  }, [showBB]);
 
   return (
     <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
@@ -199,54 +334,10 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
         </div>
       </div>
 
-      {/* Chart container — fixed height, card overlaid inside */}
-      <div style={{ height: 360, flexShrink: 0, position: 'relative' }}>
+      {/* Chart container */}
+      <div style={{ position: 'relative', flexShrink: 0 }}>
         <OHLCVCard ref={cardRef} initial={lastBar} />
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={displayData}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-            barCategoryGap={0}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-          >
-            <CartesianGrid stroke="#f3f4f6" strokeDasharray="0" vertical={false} />
-            <XAxis dataKey="date" tickFormatter={xFmt}
-              tick={{ fontSize: 10, fill: '#c4c9d4' }} tickLine={false} axisLine={false}
-              interval="preserveStartEnd" />
-            <YAxis domain={[priceMin, priceMax]}
-              tickFormatter={v => `$${v.toFixed(0)}`}
-              tick={{ fontSize: 10, fill: '#c4c9d4' }} tickLine={false} axisLine={false}
-              width={52} orientation="right" />
-
-            {/* Invisible line — gives Recharts a series for reliable hover tracking */}
-            <Line dataKey="close" stroke="transparent" dot={false} legendType="none" isAnimationActive={false} />
-
-            <Tooltip content={() => null} cursor={{ stroke: '#d1d5db', strokeWidth: 1 }} />
-
-            {showBB && <>
-              <Line dataKey="bb_upper" stroke="#10b98130" strokeWidth={1} dot={false} legendType="none" isAnimationActive={false} />
-              <Line dataKey="bb_lower" stroke="#10b98130" strokeWidth={1} dot={false} legendType="none" isAnimationActive={false} />
-              <Line dataKey="bb_mid"   stroke="#10b98155" strokeWidth={1} strokeDasharray="3 3" dot={false} legendType="none" isAnimationActive={false} />
-            </>}
-            {showSMA && <>
-              <Line dataKey="sma20"  stroke="#f59e0b" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
-              <Line dataKey="sma50"  stroke="#3b82f6" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
-              <Line dataKey="sma200" stroke="#8b5cf6" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
-            </>}
-
-            <Bar dataKey="close" shape={CANDLE_SHAPE} isAnimationActive={false} />
-
-            {indicators.support_resistance?.r1 && (
-              <ReferenceLine y={indicators.support_resistance.r1} stroke="#ef444466" strokeDasharray="5 4"
-                label={{ value: 'R1', fill: '#ef4444', fontSize: 9, position: 'insideTopRight' }} />
-            )}
-            {indicators.support_resistance?.s1 && (
-              <ReferenceLine y={indicators.support_resistance.s1} stroke="#10b98166" strokeDasharray="5 4"
-                label={{ value: 'S1', fill: '#10b981', fontSize: 9, position: 'insideBottomRight' }} />
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
+        <div ref={containerRef} />
       </div>
 
       {/* Period tabs */}
