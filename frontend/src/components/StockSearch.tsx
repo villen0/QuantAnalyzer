@@ -149,7 +149,7 @@ export default function StockSearch({ onSearch, loading }: Props) {
                 flexShrink: 0,
               }}
             >
-              {loading ? 'Loading…' : 'Analyze'}
+              {loading ? 'Loading…' : 'Search'}
             </button>
           </div>
 
