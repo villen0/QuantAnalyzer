@@ -26,31 +26,30 @@ const PERIOD_BUTTONS = [
 // ── Fixed info bar ────────────────────────────────────────────────────────────
 
 function InfoBar({ bar }: { bar: any }) {
-  if (!bar) return <div style={{ height: 32 }} />;
-  const isUp = bar.close >= bar.open;
-  const change = bar.close - bar.open;
-  const changePct = bar.open > 0 ? (change / bar.open) * 100 : 0;
+  const isUp = bar ? bar.close >= bar.open : true;
+  const changePct = bar && bar.open > 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0;
   const col = isUp ? '#059669' : '#dc2626';
-  const vol = bar.volume >= 1e9
+  const vol = bar && bar.volume >= 1e9
     ? `${(bar.volume / 1e9).toFixed(2)}B`
-    : `${(bar.volume / 1e6).toFixed(2)}M`;
-  const dateStr = bar.date?.includes(' ')
-    ? bar.date.slice(0, 16) + ' ET'
-    : bar.date?.slice(0, 10);
+    : bar ? `${(bar.volume / 1e6).toFixed(2)}M` : '—';
+  const dateStr = bar
+    ? bar.date?.includes(' ') ? bar.date.slice(0, 16) + ' ET' : bar.date?.slice(0, 10)
+    : '';
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 16px',
-      padding: '6px 20px', fontSize: 11, background: '#fafafa',
-      borderBottom: '1px solid #f3f4f6', minHeight: 32,
+      display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 16,
+      padding: '0 20px', fontSize: 11, background: '#fafafa',
+      borderBottom: '1px solid #f3f4f6',
+      height: 34, overflow: 'hidden',
     }}>
-      <span style={{ color: '#9ca3af' }}>{dateStr}</span>
-      <span style={{ color: '#6b7280' }}>O <b style={{ color: '#111827' }}>${bar.open.toFixed(2)}</b></span>
-      <span style={{ color: '#6b7280' }}>H <b style={{ color: '#059669' }}>${bar.high.toFixed(2)}</b></span>
-      <span style={{ color: '#6b7280' }}>L <b style={{ color: '#dc2626' }}>${bar.low.toFixed(2)}</b></span>
-      <span style={{ color: '#6b7280' }}>C <b style={{ color: col }}>${bar.close.toFixed(2)}</b></span>
-      <span style={{ color: col, fontWeight: 700 }}>{isUp ? '▲' : '▼'} {Math.abs(changePct).toFixed(2)}%</span>
-      <span style={{ color: '#9ca3af' }}>Vol <b style={{ color: '#6b7280' }}>{vol}</b></span>
+      <span style={{ color: '#9ca3af', flexShrink: 0 }}>{dateStr}</span>
+      <span style={{ color: '#6b7280', flexShrink: 0 }}>O <b style={{ color: '#111827' }}>{bar ? `$${bar.open.toFixed(2)}` : '—'}</b></span>
+      <span style={{ color: '#6b7280', flexShrink: 0 }}>H <b style={{ color: '#059669' }}>{bar ? `$${bar.high.toFixed(2)}` : '—'}</b></span>
+      <span style={{ color: '#6b7280', flexShrink: 0 }}>L <b style={{ color: '#dc2626' }}>{bar ? `$${bar.low.toFixed(2)}` : '—'}</b></span>
+      <span style={{ color: '#6b7280', flexShrink: 0 }}>C <b style={{ color: col }}>{bar ? `$${bar.close.toFixed(2)}` : '—'}</b></span>
+      <span style={{ color: col, fontWeight: 700, flexShrink: 0 }}>{bar ? `${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%` : ''}</span>
+      <span style={{ color: '#9ca3af', flexShrink: 0 }}>Vol <b style={{ color: '#6b7280' }}>{vol}</b></span>
     </div>
   );
 }
@@ -160,9 +159,9 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       {/* Info bar */}
       <InfoBar bar={hoveredBar ?? displayData[displayData.length - 1]} />
 
-      {/* Chart */}
-      <div style={{ padding: '8px 4px 0' }}>
-        <ResponsiveContainer width="100%" height={340}>
+      {/* Chart — fixed height container prevents layout shift on hover */}
+      <div style={{ padding: '8px 4px 0', height: 356, flexShrink: 0 }}>
+        <ResponsiveContainer width="100%" height={348}>
           <ComposedChart
             data={displayData}
             margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
