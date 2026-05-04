@@ -25,7 +25,7 @@ const PERIOD_BUTTONS = [
 
 // ── Fixed info bar (shown above chart, updates on hover) ─────────────────────
 
-function InfoBar({ bar, period }: { bar: any; period: string }) {
+function InfoBar({ bar }: { bar: any; period: string }) {
   if (!bar) return <div style={{ height: 28 }} />;
   const isUp = bar.close >= bar.open;
   const change = bar.close - bar.open;
