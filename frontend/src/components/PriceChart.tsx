@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -12,114 +12,118 @@ interface Props {
   onPeriodChange: (p: string) => void;
 }
 
-const PERIOD_BUTTONS = [
-  { label: '1D',  api: '1d'  },
-  { label: '1W',  api: '5d'  },
-  { label: '1M',  api: '1mo' },
-  { label: '3M',  api: '3mo' },
+const PERIODS = [
+  { label: '1D', api: '1d' },
+  { label: '1W', api: '5d' },
+  { label: '1M', api: '1mo' },
+  { label: '3M', api: '3mo' },
   { label: 'YTD', api: 'ytd' },
-  { label: '1Y',  api: '1y'  },
-  { label: '5Y',  api: '5y'  },
+  { label: '1Y', api: '1y' },
+  { label: '5Y', api: '5y' },
   { label: 'MAX', api: 'max' },
 ];
 
-// ── Fixed info bar ────────────────────────────────────────────────────────────
+// ── InfoBar — isolated state, chart never re-renders on hover ─────────────────
 
-function InfoBar({ bar }: { bar: any }) {
+interface InfoBarHandle { update: (bar: any) => void }
+
+const InfoBar = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) => {
+  const [bar, setBar] = useState<any>(initial);
+
+  useImperativeHandle(ref, () => ({ update: setBar }), []);
+
+  const fmt  = (v: number) => `$${v.toFixed(2)}`;
   const isUp = bar ? bar.close >= bar.open : true;
-  const changePct = bar && bar.open > 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0;
-  const col = isUp ? '#059669' : '#dc2626';
-  const vol = bar && bar.volume >= 1e9
+  const pct  = bar?.open > 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0;
+  const col  = isUp ? '#059669' : '#dc2626';
+  const vol  = !bar ? '—' : bar.volume >= 1e9
     ? `${(bar.volume / 1e9).toFixed(2)}B`
-    : bar ? `${(bar.volume / 1e6).toFixed(2)}M` : '—';
-  const dateStr = bar
+    : `${(bar.volume / 1e6).toFixed(2)}M`;
+  const date = bar
     ? bar.date?.includes(' ') ? bar.date.slice(0, 16) + ' ET' : bar.date?.slice(0, 10)
     : '';
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 16,
-      padding: '0 20px', fontSize: 11, background: '#fafafa',
-      borderBottom: '1px solid #f3f4f6',
-      height: 34, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', gap: 20,
+      height: 36, padding: '0 20px', flexShrink: 0, overflow: 'hidden',
+      background: '#f9fafb', borderBottom: '1px solid #f1f5f9', fontSize: 11,
     }}>
-      <span style={{ color: '#9ca3af', flexShrink: 0 }}>{dateStr}</span>
-      <span style={{ color: '#6b7280', flexShrink: 0 }}>O <b style={{ color: '#111827' }}>{bar ? `$${bar.open.toFixed(2)}` : '—'}</b></span>
-      <span style={{ color: '#6b7280', flexShrink: 0 }}>H <b style={{ color: '#059669' }}>{bar ? `$${bar.high.toFixed(2)}` : '—'}</b></span>
-      <span style={{ color: '#6b7280', flexShrink: 0 }}>L <b style={{ color: '#dc2626' }}>{bar ? `$${bar.low.toFixed(2)}` : '—'}</b></span>
-      <span style={{ color: '#6b7280', flexShrink: 0 }}>C <b style={{ color: col }}>{bar ? `$${bar.close.toFixed(2)}` : '—'}</b></span>
-      <span style={{ color: col, fontWeight: 700, flexShrink: 0 }}>{bar ? `${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%` : ''}</span>
-      <span style={{ color: '#9ca3af', flexShrink: 0 }}>Vol <b style={{ color: '#6b7280' }}>{vol}</b></span>
+      <span style={{ color: '#9ca3af', minWidth: 100 }}>{date}</span>
+      {bar && <>
+        <span style={{ color: '#6b7280' }}>O <span style={{ color: '#111827', fontWeight: 600 }}>{fmt(bar.open)}</span></span>
+        <span style={{ color: '#6b7280' }}>H <span style={{ color: '#059669', fontWeight: 600 }}>{fmt(bar.high)}</span></span>
+        <span style={{ color: '#6b7280' }}>L <span style={{ color: '#dc2626', fontWeight: 600 }}>{fmt(bar.low)}</span></span>
+        <span style={{ color: '#6b7280' }}>C <span style={{ color: col, fontWeight: 600 }}>{fmt(bar.close)}</span></span>
+        <span style={{ color: col, fontWeight: 700 }}>{isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%</span>
+        <span style={{ color: '#9ca3af' }}>Vol <span style={{ color: '#6b7280', fontWeight: 600 }}>{vol}</span></span>
+      </>}
     </div>
   );
-}
+});
 
-// ── MA computation ────────────────────────────────────────────────────────────
+// ── Data helpers ──────────────────────────────────────────────────────────────
 
-function addMAs(data: OHLCVBar[], periods: number[]): any[] {
-  return data.map((bar, i) => {
-    const enriched: any = { ...bar };
-    for (const p of periods) {
+function enrich(data: OHLCVBar[]): any[] {
+  const out = data.map((bar, i) => {
+    const e: any = { ...bar };
+    for (const p of [20, 50, 200]) {
       if (i >= p - 1) {
-        const slice = data.slice(i - p + 1, i + 1);
-        enriched[`sma${p}`] = parseFloat((slice.reduce((s, b) => s + b.close, 0) / p).toFixed(2));
+        const sl = data.slice(i - p + 1, i + 1);
+        e[`sma${p}`] = +(sl.reduce((s, b) => s + b.close, 0) / p).toFixed(2);
       }
     }
-    return enriched;
-  });
-}
-
-function addBB(data: any[]): any[] {
-  return data.map((bar, i) => {
     if (i >= 19) {
-      const slice = data.slice(i - 19, i + 1);
-      const mean = slice.reduce((s: number, b: any) => s + b.close, 0) / 20;
-      const std  = Math.sqrt(slice.reduce((s: number, b: any) => s + (b.close - mean) ** 2, 0) / 20);
-      bar.bb_upper = parseFloat((mean + 2 * std).toFixed(2));
-      bar.bb_lower = parseFloat((mean - 2 * std).toFixed(2));
-      bar.bb_mid   = parseFloat(mean.toFixed(2));
+      const sl = data.slice(i - 19, i + 1);
+      const mean = sl.reduce((s, b) => s + b.close, 0) / 20;
+      const std  = Math.sqrt(sl.reduce((s, b) => s + (b.close - mean) ** 2, 0) / 20);
+      e.bb_upper = +(mean + 2 * std).toFixed(2);
+      e.bb_lower = +(mean - 2 * std).toFixed(2);
+      e.bb_mid   = +mean.toFixed(2);
     }
-    return bar;
+    return e;
   });
+  return out;
 }
 
 // ── Candlestick shape ─────────────────────────────────────────────────────────
 
-function makeCandleShape(priceMin: number, priceMax: number) {
-  return function CandleShape({ x, width, background, payload }: any) {
-    if (!payload || !background || background.height <= 0) return null;
-    const { open = 0, high = 0, low = 0, close = 0 } = payload;
-    const range = priceMax - priceMin;
-    if (range <= 0) return null;
+function CandleShape({ x, width, background, payload }: any) {
+  if (!payload || !background || background.height <= 0) return null;
+  const { open = 0, high = 0, low = 0, close = 0, priceMin, priceMax } = payload;
+  const range = priceMax - priceMin;
+  if (range <= 0) return null;
 
-    const isGreen = close >= open;
-    const color   = isGreen ? '#10b981' : '#ef4444';
-    const toY = (p: number) => background.y + background.height * (1 - (p - priceMin) / range);
+  const isUp  = close >= open;
+  const color = isUp ? '#10b981' : '#ef4444';
+  const toY   = (p: number) => background.y + background.height * (1 - (p - priceMin) / range);
 
-    const bodyTop = Math.min(toY(open), toY(close));
-    const bodyH   = Math.max(Math.abs(toY(open) - toY(close)), 1);
-    const cw      = Math.max(width * 0.65, 2);
-    const cx      = x + width / 2;
+  const bodyTop = Math.min(toY(open), toY(close));
+  const bodyH   = Math.max(Math.abs(toY(open) - toY(close)), 1);
+  const cw      = Math.max(width * 0.6, 1.5);
+  const cx      = x + width / 2;
 
-    return (
-      <g>
-        <line x1={cx} y1={toY(high)} x2={cx} y2={toY(low)} stroke={color} strokeWidth={1} />
-        <rect x={cx - cw / 2} y={bodyTop} width={cw} height={bodyH}
-          fill={isGreen ? color : 'transparent'} stroke={color} strokeWidth={1} />
-      </g>
-    );
-  };
+  return (
+    <g>
+      <line x1={cx} y1={toY(high)} x2={cx} y2={toY(low)} stroke={color} strokeWidth={1} />
+      <rect
+        x={cx - cw / 2} y={bodyTop} width={cw} height={bodyH}
+        fill={isUp ? color : 'transparent'} stroke={color} strokeWidth={1}
+      />
+    </g>
+  );
 }
 
-// ── Toggle pill ───────────────────────────────────────────────────────────────
+// ── Pill toggle ───────────────────────────────────────────────────────────────
 
 function Pill({ label, active, color, onClick }: { label: string; active: boolean; color: string; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600,
-      background: active ? `${color}15` : 'transparent',
-      color:      active ? color         : '#9ca3af',
-      border:     `1px solid ${active ? `${color}40` : '#e5e7eb'}`,
+      fontSize: 10, padding: '2px 9px', borderRadius: 20, fontWeight: 600,
+      background: active ? `${color}15` : '#f3f4f6',
+      color: active ? color : '#9ca3af',
+      border: `1px solid ${active ? `${color}40` : '#e5e7eb'}`,
+      transition: 'all 0.15s',
     }}>{label}</button>
   );
 }
@@ -129,110 +133,123 @@ function Pill({ label, active, color, onClick }: { label: string; active: boolea
 export default function PriceChart({ data, indicators, period, onPeriodChange }: Props) {
   const [showBB,  setShowBB]  = useState(false);
   const [showSMA, setShowSMA] = useState(false);
-  const [hoveredBar, setHoveredBar] = useState<any>(null);
+  const infoRef = useRef<InfoBarHandle>(null);
 
-  const handleMouseMove  = useCallback((e: any) => {
-    if (e?.activePayload?.[0]?.payload) setHoveredBar(e.activePayload[0].payload);
+  // Enrich data once — stable between renders unless data changes
+  const displayData = useMemo(() => {
+    const enriched = enrich(data);
+    const pMin = Math.min(...enriched.map(d => d.low)) * 0.99;
+    const pMax = Math.max(...enriched.map(d => d.high)) * 1.01;
+    // Embed domain into each row so CandleShape can access it as payload prop
+    return enriched.map(d => ({ ...d, priceMin: pMin, priceMax: pMax }));
+  }, [data]);
+
+  const priceMin = displayData[0]?.priceMin ?? 0;
+  const priceMax = displayData[0]?.priceMax ?? 1;
+
+  const xFmt = useCallback((v: string) => {
+    if (!v) return '';
+    const d = new Date(v.replace(' ', 'T'));
+    if (period === '1d') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    if (period === '5y' || period === 'max') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }, [period]);
+
+  // Update InfoBar imperatively — zero chart re-renders on hover
+  const handleMouseMove = useCallback((e: any) => {
+    const p = e?.activePayload?.[0]?.payload;
+    if (p?.open != null && p?.high != null) infoRef.current?.update(p);
   }, []);
-  const handleMouseLeave = useCallback(() => setHoveredBar(null), []);
 
-  const displayData = addBB(addMAs(data, [20, 50, 200]));
-  const priceMin    = Math.min(...displayData.map((d: any) => d.low))  * 0.99;
-  const priceMax    = Math.max(...displayData.map((d: any) => d.high)) * 1.01;
-  const CandleShape = makeCandleShape(priceMin, priceMax);
+  const handleMouseLeave = useCallback(() => {
+    const last = displayData[displayData.length - 1];
+    if (last) infoRef.current?.update(last);
+  }, [displayData]);
+
+  const lastBar = displayData[displayData.length - 1];
 
   return (
-    <div className="card" style={{ padding: 0 }}>
+    <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
 
-      {/* Header */}
+      {/* ── Header ─── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px', borderBottom: '1px solid #e5e7eb',
+        padding: '12px 20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0,
       }}>
         <span className="card-header" style={{ marginBottom: 0 }}>Price Chart</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <Pill label="BB"   active={showBB}  color="#10b981" onClick={() => setShowBB(v => !v)} />
-          <Pill label="MAs"  active={showSMA} color="#3b82f6" onClick={() => setShowSMA(v => !v)} />
+          <Pill label="BB"  active={showBB}  color="#10b981" onClick={() => setShowBB(v => !v)} />
+          <Pill label="MAs" active={showSMA} color="#3b82f6" onClick={() => setShowSMA(v => !v)} />
         </div>
       </div>
 
-      {/* Info bar */}
-      <InfoBar bar={hoveredBar ?? displayData[displayData.length - 1]} />
+      {/* ── OHLCV info bar — isolated, never causes chart re-render ─── */}
+      <InfoBar ref={infoRef} initial={lastBar} />
 
-      {/* Chart — fixed height container prevents layout shift on hover */}
-      <div style={{ padding: '8px 4px 0', height: 356, flexShrink: 0 }}>
-        <ResponsiveContainer width="100%" height={348}>
+      {/* ── Chart — fixed height, never resizes on hover ─── */}
+      <div style={{ height: 360, flexShrink: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={displayData}
-            margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
+            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
             barCategoryGap={0}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+            <CartesianGrid stroke="#f1f5f9" strokeDasharray="0" vertical={false} />
             <XAxis
-              dataKey="date"
-              tickFormatter={v => {
-                if (!v) return '';
-                const d = new Date(v.replace(' ', 'T'));
-                if (period === '1d') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-                if (period === '5y' || period === 'max') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-              }}
-              tick={{ fontSize: 10, fill: '#9ca3af' }}
-              tickLine={false} axisLine={false}
+              dataKey="date" tickFormatter={xFmt}
+              tick={{ fontSize: 10, fill: '#c4c9d4' }} tickLine={false} axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
               domain={[priceMin, priceMax]}
               tickFormatter={v => `$${v.toFixed(0)}`}
-              tick={{ fontSize: 10, fill: '#9ca3af' }}
-              tickLine={false} axisLine={false} width={56}
-              orientation="right"
+              tick={{ fontSize: 10, fill: '#c4c9d4' }} tickLine={false} axisLine={false}
+              width={52} orientation="right"
             />
-            <Tooltip content={() => null} cursor={{ stroke: '#d1d5db', strokeWidth: 1 }} />
+            <Tooltip content={() => null} cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }} />
 
             {showBB && <>
-              <Line dataKey="bb_upper" stroke="#10b98140" strokeWidth={1} dot={false} legendType="none" />
-              <Line dataKey="bb_lower" stroke="#10b98140" strokeWidth={1} dot={false} legendType="none" />
-              <Line dataKey="bb_mid"   stroke="#10b98166" strokeWidth={1} strokeDasharray="4 4" dot={false} legendType="none" />
+              <Line dataKey="bb_upper" stroke="#10b98130" strokeWidth={1} dot={false} legendType="none" isAnimationActive={false} />
+              <Line dataKey="bb_lower" stroke="#10b98130" strokeWidth={1} dot={false} legendType="none" isAnimationActive={false} />
+              <Line dataKey="bb_mid"   stroke="#10b98155" strokeWidth={1} strokeDasharray="3 3" dot={false} legendType="none" isAnimationActive={false} />
             </>}
-
             {showSMA && <>
-              <Line dataKey="sma20"  stroke="#f59e0b" strokeWidth={1.5} dot={false} legendType="none" />
-              <Line dataKey="sma50"  stroke="#3b82f6" strokeWidth={1.5} dot={false} legendType="none" />
-              <Line dataKey="sma200" stroke="#8b5cf6" strokeWidth={1.5} dot={false} legendType="none" />
+              <Line dataKey="sma20"  stroke="#f59e0b" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
+              <Line dataKey="sma50"  stroke="#3b82f6" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
+              <Line dataKey="sma200" stroke="#8b5cf6" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
             </>}
 
             <Bar dataKey="close" shape={<CandleShape />} isAnimationActive={false} />
 
             {indicators.support_resistance?.r1 && (
-              <ReferenceLine y={indicators.support_resistance.r1} stroke="#ef4444" strokeDasharray="6 4" strokeOpacity={0.4}
-                label={{ value: `R1`, fill: '#ef4444', fontSize: 9, position: 'insideTopRight' }} />
+              <ReferenceLine y={indicators.support_resistance.r1} stroke="#ef444466" strokeDasharray="5 4"
+                label={{ value: 'R1', fill: '#ef4444', fontSize: 9, position: 'insideTopRight' }} />
             )}
             {indicators.support_resistance?.s1 && (
-              <ReferenceLine y={indicators.support_resistance.s1} stroke="#10b981" strokeDasharray="6 4" strokeOpacity={0.4}
-                label={{ value: `S1`, fill: '#10b981', fontSize: 9, position: 'insideBottomRight' }} />
+              <ReferenceLine y={indicators.support_resistance.s1} stroke="#10b98166" strokeDasharray="5 4"
+                label={{ value: 'S1', fill: '#10b981', fontSize: 9, position: 'insideBottomRight' }} />
             )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Period selector — Robinhood underline style */}
-      <div style={{ display: 'flex', justifyContent: 'center', borderTop: '1px solid #f3f4f6', padding: '0 20px' }}>
-        {PERIOD_BUTTONS.map(btn => {
+      {/* ── Period tabs — Robinhood underline style ─── */}
+      <div style={{ display: 'flex', borderTop: '1px solid #f1f5f9', flexShrink: 0 }}>
+        {PERIODS.map(btn => {
           const active = btn.api === period;
           return (
             <button
               key={btn.api}
               onClick={() => onPeriodChange(btn.api)}
               style={{
-                fontSize: 12, padding: '12px 14px 10px', fontWeight: active ? 700 : 500,
+                flex: 1, padding: '12px 0 10px', fontSize: 12,
+                fontWeight: active ? 700 : 500,
                 background: 'transparent', border: 'none',
-                color: active ? '#111827' : '#9ca3af',
                 borderBottom: `2px solid ${active ? '#2563eb' : 'transparent'}`,
-                transition: 'all 0.15s',
-                letterSpacing: '0.01em',
+                color: active ? '#111827' : '#9ca3af',
+                transition: 'color 0.15s, border-color 0.15s',
               }}
             >
               {btn.label}
