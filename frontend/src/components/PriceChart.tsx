@@ -23,41 +23,66 @@ const PERIODS = [
   { label: 'MAX', api: 'max' },
 ];
 
-// ── InfoBar — isolated state, chart never re-renders on hover ─────────────────
+// ── Floating OHLCV card — pinned top-left inside chart, isolated renders ─────
 
 interface InfoBarHandle { update: (bar: any) => void }
 
-const InfoBar = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) => {
+const InfoCard = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) => {
   const [bar, setBar] = useState<any>(initial);
-
   useImperativeHandle(ref, () => ({ update: setBar }), []);
 
-  const fmt  = (v: number) => `$${v.toFixed(2)}`;
-  const isUp = bar ? bar.close >= bar.open : true;
-  const pct  = bar?.open > 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0;
+  if (!bar) return null;
+  const isUp = bar.close >= bar.open;
+  const pct  = bar.open > 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0;
   const col  = isUp ? '#059669' : '#dc2626';
-  const vol  = !bar ? '—' : bar.volume >= 1e9
+  const vol  = bar.volume >= 1e9
     ? `${(bar.volume / 1e9).toFixed(2)}B`
     : `${(bar.volume / 1e6).toFixed(2)}M`;
-  const date = bar
-    ? bar.date?.includes(' ') ? bar.date.slice(0, 16) + ' ET' : bar.date?.slice(0, 10)
-    : '';
+  const date = bar.date?.includes(' ')
+    ? bar.date.slice(0, 16) + ' ET'
+    : bar.date?.slice(0, 10);
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 20,
-      height: 36, padding: '0 20px', flexShrink: 0, overflow: 'hidden',
-      background: '#f9fafb', borderBottom: '1px solid #f1f5f9', fontSize: 11,
+      position: 'absolute', top: 12, left: 12, zIndex: 10,
+      background: 'rgba(255,255,255,0.95)',
+      border: '1px solid #e5e7eb',
+      borderRadius: 8,
+      padding: '8px 12px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      fontSize: 11, minWidth: 160,
+      pointerEvents: 'none',
     }}>
-      <span style={{ color: '#9ca3af', minWidth: 100 }}>{date}</span>
-      {bar && <>
-        <span style={{ color: '#6b7280' }}>O <span style={{ color: '#111827', fontWeight: 600 }}>{fmt(bar.open)}</span></span>
-        <span style={{ color: '#6b7280' }}>H <span style={{ color: '#059669', fontWeight: 600 }}>{fmt(bar.high)}</span></span>
-        <span style={{ color: '#6b7280' }}>L <span style={{ color: '#dc2626', fontWeight: 600 }}>{fmt(bar.low)}</span></span>
-        <span style={{ color: '#6b7280' }}>C <span style={{ color: col, fontWeight: 600 }}>{fmt(bar.close)}</span></span>
-        <span style={{ color: col, fontWeight: 700 }}>{isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%</span>
-        <span style={{ color: '#9ca3af' }}>Vol <span style={{ color: '#6b7280', fontWeight: 600 }}>{vol}</span></span>
-      </>}
+      {/* Date */}
+      <div style={{ color: '#9ca3af', marginBottom: 6, fontSize: 10 }}>{date}</div>
+      {/* Close + change */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 7 }}>
+        <span style={{ fontSize: 18, fontWeight: 800, color: col, letterSpacing: '-0.5px' }}>
+          ${bar.close.toFixed(2)}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: col }}>
+          {isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%
+        </span>
+      </div>
+      {/* OHLC */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px', paddingTop: 6, borderTop: '1px solid #f1f5f9', marginBottom: 6 }}>
+        {[
+          { l: 'Open',  v: bar.open,  c: '#6b7280' },
+          { l: 'High',  v: bar.high,  c: '#059669' },
+          { l: 'Low',   v: bar.low,   c: '#dc2626' },
+          { l: 'Close', v: bar.close, c: col },
+        ].map(({ l, v, c }) => (
+          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+            <span style={{ color: '#9ca3af' }}>{l}</span>
+            <span style={{ color: c, fontWeight: 600 }}>${v.toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+      {/* Volume */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 5, borderTop: '1px solid #f1f5f9' }}>
+        <span style={{ color: '#9ca3af' }}>Vol</span>
+        <span style={{ color: '#2563eb', fontWeight: 600 }}>{vol}</span>
+      </div>
     </div>
   );
 });
@@ -183,11 +208,9 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
         </div>
       </div>
 
-      {/* ── OHLCV info bar — isolated, never causes chart re-render ─── */}
-      <InfoBar ref={infoRef} initial={lastBar} />
-
-      {/* ── Chart — fixed height, never resizes on hover ─── */}
-      <div style={{ height: 360, flexShrink: 0 }}>
+      {/* ── Chart — card overlay pinned top-left, never causes chart re-render ─── */}
+      <div style={{ height: 360, flexShrink: 0, position: 'relative' }}>
+        <InfoCard ref={infoRef} initial={lastBar} />
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={displayData}
