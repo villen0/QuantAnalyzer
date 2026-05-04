@@ -140,12 +140,12 @@ export default function StockSearch({ onSearch, loading }: Props) {
             </div>
             <button
               onClick={() => { const t = value.trim().toUpperCase(); if (t) commit(t); }}
-              disabled={loading || !value.trim()}
+              disabled={loading}
               style={{
-                background: loading || !value.trim() ? '#e5e7eb' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                background: loading ? '#e5e7eb' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
                 color: 'white', border: 'none', borderRadius: 8,
                 padding: '0 20px', fontSize: 14, fontWeight: 600,
-                opacity: loading || !value.trim() ? 0.6 : 1,
+                opacity: loading ? 0.6 : 1,
                 flexShrink: 0,
               }}
             >
