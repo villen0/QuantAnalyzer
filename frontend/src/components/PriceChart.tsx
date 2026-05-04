@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { useState, useCallback, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -23,11 +23,11 @@ const PERIODS = [
   { label: 'MAX', api: 'max' },
 ];
 
-// ── Floating OHLCV card — pinned top-left inside chart, isolated renders ─────
+// ── OHLCV card — pinned top-left, isolated renders via imperative ref ─────────
 
-interface InfoBarHandle { update: (bar: any) => void }
+interface CardHandle { update: (bar: any) => void }
 
-const InfoCard = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) => {
+const OHLCVCard = forwardRef<CardHandle, { initial: any }>(({ initial }, ref) => {
   const [bar, setBar] = useState<any>(initial);
   useImperativeHandle(ref, () => ({ update: setBar }), []);
 
@@ -44,18 +44,12 @@ const InfoCard = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) 
 
   return (
     <div style={{
-      position: 'absolute', top: 12, left: 12, zIndex: 10,
-      background: 'rgba(255,255,255,0.95)',
-      border: '1px solid #e5e7eb',
-      borderRadius: 8,
-      padding: '8px 12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-      fontSize: 11, minWidth: 160,
-      pointerEvents: 'none',
+      position: 'absolute', top: 10, left: 10, zIndex: 10, pointerEvents: 'none',
+      background: 'rgba(255,255,255,0.96)', border: '1px solid #e5e7eb',
+      borderRadius: 8, padding: '8px 12px',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.09)', fontSize: 11, minWidth: 162,
     }}>
-      {/* Date */}
-      <div style={{ color: '#9ca3af', marginBottom: 6, fontSize: 10 }}>{date}</div>
-      {/* Close + change */}
+      <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 5 }}>{date}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 7 }}>
         <span style={{ fontSize: 18, fontWeight: 800, color: col, letterSpacing: '-0.5px' }}>
           ${bar.close.toFixed(2)}
@@ -64,8 +58,10 @@ const InfoCard = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) 
           {isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%
         </span>
       </div>
-      {/* OHLC */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px', paddingTop: 6, borderTop: '1px solid #f1f5f9', marginBottom: 6 }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px',
+        paddingTop: 6, borderTop: '1px solid #f1f5f9', marginBottom: 6,
+      }}>
         {[
           { l: 'Open',  v: bar.open,  c: '#6b7280' },
           { l: 'High',  v: bar.high,  c: '#059669' },
@@ -78,7 +74,6 @@ const InfoCard = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) 
           </div>
         ))}
       </div>
-      {/* Volume */}
       <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 5, borderTop: '1px solid #f1f5f9' }}>
         <span style={{ color: '#9ca3af' }}>Vol</span>
         <span style={{ color: '#2563eb', fontWeight: 600 }}>{vol}</span>
@@ -87,10 +82,10 @@ const InfoCard = forwardRef<InfoBarHandle, { initial: any }>(({ initial }, ref) 
   );
 });
 
-// ── Data helpers ──────────────────────────────────────────────────────────────
+// ── Data helpers (defined outside component — never recreated) ────────────────
 
 function enrich(data: OHLCVBar[]): any[] {
-  const out = data.map((bar, i) => {
+  return data.map((bar, i) => {
     const e: any = { ...bar };
     for (const p of [20, 50, 200]) {
       if (i >= p - 1) {
@@ -108,10 +103,9 @@ function enrich(data: OHLCVBar[]): any[] {
     }
     return e;
   });
-  return out;
 }
 
-// ── Candlestick shape ─────────────────────────────────────────────────────────
+// ── Candlestick shape (defined outside component — stable reference) ──────────
 
 function CandleShape({ x, width, background, payload }: any) {
   if (!payload || !background || background.height <= 0) return null;
@@ -122,7 +116,6 @@ function CandleShape({ x, width, background, payload }: any) {
   const isUp  = close >= open;
   const color = isUp ? '#10b981' : '#ef4444';
   const toY   = (p: number) => background.y + background.height * (1 - (p - priceMin) / range);
-
   const bodyTop = Math.min(toY(open), toY(close));
   const bodyH   = Math.max(Math.abs(toY(open) - toY(close)), 1);
   const cw      = Math.max(width * 0.6, 1.5);
@@ -131,13 +124,13 @@ function CandleShape({ x, width, background, payload }: any) {
   return (
     <g>
       <line x1={cx} y1={toY(high)} x2={cx} y2={toY(low)} stroke={color} strokeWidth={1} />
-      <rect
-        x={cx - cw / 2} y={bodyTop} width={cw} height={bodyH}
-        fill={isUp ? color : 'transparent'} stroke={color} strokeWidth={1}
-      />
+      <rect x={cx - cw / 2} y={bodyTop} width={cw} height={bodyH}
+        fill={isUp ? color : 'transparent'} stroke={color} strokeWidth={1} />
     </g>
   );
 }
+
+const CANDLE_SHAPE = <CandleShape />;
 
 // ── Pill toggle ───────────────────────────────────────────────────────────────
 
@@ -148,7 +141,6 @@ function Pill({ label, active, color, onClick }: { label: string; active: boolea
       background: active ? `${color}15` : '#f3f4f6',
       color: active ? color : '#9ca3af',
       border: `1px solid ${active ? `${color}40` : '#e5e7eb'}`,
-      transition: 'all 0.15s',
     }}>{label}</button>
   );
 }
@@ -158,19 +150,19 @@ function Pill({ label, active, color, onClick }: { label: string; active: boolea
 export default function PriceChart({ data, indicators, period, onPeriodChange }: Props) {
   const [showBB,  setShowBB]  = useState(false);
   const [showSMA, setShowSMA] = useState(false);
-  const infoRef = useRef<InfoBarHandle>(null);
+  const cardRef = useRef<CardHandle>(null);
 
-  // Enrich data once — stable between renders unless data changes
+  // All expensive work memoized — hover re-renders are cheap
   const displayData = useMemo(() => {
     const enriched = enrich(data);
-    const pMin = Math.min(...enriched.map(d => d.low)) * 0.99;
+    const pMin = Math.min(...enriched.map(d => d.low))  * 0.99;
     const pMax = Math.max(...enriched.map(d => d.high)) * 1.01;
-    // Embed domain into each row so CandleShape can access it as payload prop
     return enriched.map(d => ({ ...d, priceMin: pMin, priceMax: pMax }));
   }, [data]);
 
   const priceMin = displayData[0]?.priceMin ?? 0;
   const priceMax = displayData[0]?.priceMax ?? 1;
+  const lastBar  = displayData[displayData.length - 1];
 
   const xFmt = useCallback((v: string) => {
     if (!v) return '';
@@ -180,23 +172,22 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }, [period]);
 
-  // Update InfoBar imperatively — zero chart re-renders on hover
+  // The hidden Line below gives Recharts a series to track for hover — Bar alone
+  // does not reliably populate activePayload with custom shapes.
   const handleMouseMove = useCallback((e: any) => {
-    const p = e?.activePayload?.[0]?.payload;
-    if (p?.open != null && p?.high != null) infoRef.current?.update(p);
+    // Try all payload items until we find one with OHLC data
+    const hit = e?.activePayload?.find((p: any) => p?.payload?.open != null);
+    if (hit?.payload) cardRef.current?.update(hit.payload);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    const last = displayData[displayData.length - 1];
-    if (last) infoRef.current?.update(last);
-  }, [displayData]);
-
-  const lastBar = displayData[displayData.length - 1];
+    if (lastBar) cardRef.current?.update(lastBar);
+  }, [lastBar]);
 
   return (
     <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Header ─── */}
+      {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '12px 20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0,
@@ -208,9 +199,9 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
         </div>
       </div>
 
-      {/* ── Chart — card overlay pinned top-left, never causes chart re-render ─── */}
+      {/* Chart container — fixed height, card overlaid inside */}
       <div style={{ height: 360, flexShrink: 0, position: 'relative' }}>
-        <InfoCard ref={infoRef} initial={lastBar} />
+        <OHLCVCard ref={cardRef} initial={lastBar} />
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={displayData}
@@ -219,19 +210,19 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
-            <CartesianGrid stroke="#f1f5f9" strokeDasharray="0" vertical={false} />
-            <XAxis
-              dataKey="date" tickFormatter={xFmt}
+            <CartesianGrid stroke="#f3f4f6" strokeDasharray="0" vertical={false} />
+            <XAxis dataKey="date" tickFormatter={xFmt}
               tick={{ fontSize: 10, fill: '#c4c9d4' }} tickLine={false} axisLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              domain={[priceMin, priceMax]}
+              interval="preserveStartEnd" />
+            <YAxis domain={[priceMin, priceMax]}
               tickFormatter={v => `$${v.toFixed(0)}`}
               tick={{ fontSize: 10, fill: '#c4c9d4' }} tickLine={false} axisLine={false}
-              width={52} orientation="right"
-            />
-            <Tooltip content={() => null} cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }} />
+              width={52} orientation="right" />
+
+            {/* Invisible line — gives Recharts a series for reliable hover tracking */}
+            <Line dataKey="close" stroke="transparent" dot={false} legendType="none" isAnimationActive={false} />
+
+            <Tooltip content={() => null} cursor={{ stroke: '#d1d5db', strokeWidth: 1 }} />
 
             {showBB && <>
               <Line dataKey="bb_upper" stroke="#10b98130" strokeWidth={1} dot={false} legendType="none" isAnimationActive={false} />
@@ -244,7 +235,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
               <Line dataKey="sma200" stroke="#8b5cf6" strokeWidth={1.5} dot={false} legendType="none" isAnimationActive={false} />
             </>}
 
-            <Bar dataKey="close" shape={<CandleShape />} isAnimationActive={false} />
+            <Bar dataKey="close" shape={CANDLE_SHAPE} isAnimationActive={false} />
 
             {indicators.support_resistance?.r1 && (
               <ReferenceLine y={indicators.support_resistance.r1} stroke="#ef444466" strokeDasharray="5 4"
@@ -258,23 +249,19 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
         </ResponsiveContainer>
       </div>
 
-      {/* ── Period tabs — Robinhood underline style ─── */}
+      {/* Period tabs */}
       <div style={{ display: 'flex', borderTop: '1px solid #f1f5f9', flexShrink: 0 }}>
         {PERIODS.map(btn => {
           const active = btn.api === period;
           return (
-            <button
-              key={btn.api}
-              onClick={() => onPeriodChange(btn.api)}
-              style={{
-                flex: 1, padding: '12px 0 10px', fontSize: 12,
-                fontWeight: active ? 700 : 500,
-                background: 'transparent', border: 'none',
-                borderBottom: `2px solid ${active ? '#2563eb' : 'transparent'}`,
-                color: active ? '#111827' : '#9ca3af',
-                transition: 'color 0.15s, border-color 0.15s',
-              }}
-            >
+            <button key={btn.api} onClick={() => onPeriodChange(btn.api)} style={{
+              flex: 1, padding: '12px 0 10px', fontSize: 12,
+              fontWeight: active ? 700 : 500,
+              background: 'transparent', border: 'none',
+              borderBottom: `2px solid ${active ? '#2563eb' : 'transparent'}`,
+              color: active ? '#111827' : '#9ca3af',
+              transition: 'color 0.15s, border-color 0.15s',
+            }}>
               {btn.label}
             </button>
           );
