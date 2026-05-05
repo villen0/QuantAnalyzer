@@ -7,7 +7,7 @@
 }
 
 body {
-  background-color: #87CEEB;
+  background-color: #22c55e;
   color: #111827;
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   min-height: 100vh;
@@ -21,7 +21,7 @@ body {
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #87CEEB; }
+::-webkit-scrollbar-track { background: #22c55e; }
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
