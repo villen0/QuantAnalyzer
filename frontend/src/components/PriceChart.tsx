@@ -224,7 +224,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
     });
 
     // MA overlay lines (hidden by default)
-    const mkLine = (color: string, width: 1 | 1.5 | 2 = 1.5) => chart.addSeries(LineSeries, {
+    const mkLine = (color: string, width: 1 | 2 = 2) => chart.addSeries(LineSeries, {
       color, lineWidth: width,
       priceLineVisible: false, lastValueVisible: false,
       crosshairMarkerVisible: false, visible: false,
