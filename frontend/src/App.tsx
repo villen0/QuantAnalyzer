@@ -42,13 +42,13 @@ export default function App() {
     setAnalysis(null);
     setSmcAnalysis(null);
     setQuantStrategy(null);
-    setLivePrice(null);
     try {
       const d = await fetchDashboard(t, p);
       setData(d);
       if (d.smc_analysis) setSmcAnalysis(d.smc_analysis);
+      // Only set price from dashboard if we don't already have a live price
       if (d.info?.current_price) {
-        setLivePrice(d.info.current_price);
+        setLivePrice(prev => prev ?? d.info.current_price);
       }
     } catch (e: any) {
       setError(e?.response?.data?.detail || e?.message || 'Failed to load data');
@@ -78,6 +78,9 @@ export default function App() {
   const handleSearch = (t: string) => {
     setTicker(t);
     setTab('indicators');
+    setLivePrice(null);
+    setLiveChange(0);
+    setLiveChangePct(0);
     loadData(t, period);
   };
 
