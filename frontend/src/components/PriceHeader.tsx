@@ -56,7 +56,6 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
         {/* Ticker row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 22, fontWeight: 800, color: '#10b981' }}>{info.ticker}</span>
-          <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 400 }}>{info.name}</span>
           {/* LIVE dot */}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: '#10b981', letterSpacing: '0.08em' }}>
             <span style={{

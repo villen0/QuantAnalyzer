@@ -34,26 +34,29 @@ const OHLCVCard = forwardRef<CardHandle, { initial: any }>(({ initial }, ref) =>
 
   if (!bar) return null;
   const isUp = bar.close >= bar.open;
-  const pct  = bar.open > 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0;
+  const chg  = bar.close - bar.open;
+  const pct  = bar.open > 0 ? (chg / bar.open) * 100 : 0;
   const col  = isUp ? '#059669' : '#dc2626';
   const vol  = bar.volume >= 1e9
     ? `${(bar.volume / 1e9).toFixed(2)}B`
     : `${(bar.volume / 1e6).toFixed(2)}M`;
   const timeStr = bar.date?.includes(' ') ? bar.date.slice(11, 16) : '';
-  const date = timeStr && timeStr !== '00:00'
+  const dateLabel = timeStr && timeStr !== '00:00'
     ? bar.date.slice(0, 16) + ' ET'
     : bar.date?.slice(0, 10);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ color: '#9ca3af', fontSize: 10, whiteSpace: 'nowrap' }}>{date}</span>
-      <span style={{ fontSize: 14, fontWeight: 800, color: col, letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
-        ${bar.close.toFixed(2)}
-      </span>
-      <span style={{ fontSize: 11, fontWeight: 700, color: col, whiteSpace: 'nowrap' }}>
-        {isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%
-      </span>
-      <div style={{ display: 'flex', gap: 6, fontSize: 11, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span style={{ color: '#9ca3af', fontSize: 10 }}>{dateLabel}</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 18, fontWeight: 800, color: col, letterSpacing: '-0.5px' }}>
+          ${bar.close.toFixed(2)}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: col }}>
+          {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{chg.toFixed(2)} ({isUp ? '+' : ''}{pct.toFixed(2)}%)
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, fontSize: 11, flexWrap: 'wrap' }}>
         {([
           { l: 'O', v: bar.open,  c: '#6b7280' },
           { l: 'H', v: bar.high,  c: '#059669' },
@@ -65,9 +68,8 @@ const OHLCVCard = forwardRef<CardHandle, { initial: any }>(({ initial }, ref) =>
             <span style={{ color: c, fontWeight: 600 }}>${v.toFixed(2)}</span>
           </span>
         ))}
-        <span style={{ whiteSpace: 'nowrap' }}>
-          <span style={{ color: '#9ca3af' }}>Vol </span>
-          <span style={{ color: '#2563eb', fontWeight: 600 }}>{vol}</span>
+        <span style={{ whiteSpace: 'nowrap', color: '#9ca3af' }}>
+          Vol <span style={{ color: '#2563eb', fontWeight: 600 }}>{vol}</span>
         </span>
       </div>
     </div>
