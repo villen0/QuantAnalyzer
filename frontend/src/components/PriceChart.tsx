@@ -39,7 +39,8 @@ const OHLCVCard = forwardRef<CardHandle, { initial: any }>(({ initial }, ref) =>
   const vol  = bar.volume >= 1e9
     ? `${(bar.volume / 1e9).toFixed(2)}B`
     : `${(bar.volume / 1e6).toFixed(2)}M`;
-  const date = bar.date?.includes(' ')
+  const timeStr = bar.date?.includes(' ') ? bar.date.slice(11, 16) : '';
+  const date = timeStr && timeStr !== '00:00'
     ? bar.date.slice(0, 16) + ' ET'
     : bar.date?.slice(0, 10);
 

@@ -123,7 +123,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#87CEEB' }}>
+    <div style={{ minHeight: '100vh', background: '#22c55e' }}>
       <StockSearch onSearch={handleSearch} loading={loading} />
 
       {data && (
@@ -135,8 +135,9 @@ export default function App() {
         />
       )}
 
-      {/* Tabs */}
-      <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      {/* Tabs — only shown when a stock is loaded */}
+      {data && (
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '0 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', gap: 0 }}>
           {TABS.map(t => (
             <button
@@ -155,6 +156,7 @@ export default function App() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Main content */}
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 16px' }}>
