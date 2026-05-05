@@ -24,7 +24,7 @@ const PERIODS = [
   { label: 'MAX', api: 'max' },
 ];
 
-// ── OHLCV card — pinned top-left, isolated renders via imperative ref ──────────
+// ── OHLCV strip — lives in the header bar (no chart overlap) ─────────────────
 
 interface CardHandle { update: (bar: any) => void }
 
@@ -44,40 +44,33 @@ const OHLCVCard = forwardRef<CardHandle, { initial: any }>(({ initial }, ref) =>
     : bar.date?.slice(0, 10);
 
   return (
-    <div style={{
-      position: 'absolute', top: 10, left: 10, zIndex: 10, pointerEvents: 'none',
-      background: 'rgba(255,255,255,0.96)', border: '1px solid #e5e7eb',
-      borderRadius: 8, padding: '8px 12px',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.09)', fontSize: 11, minWidth: 162,
-    }}>
-      <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 5 }}>{date}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 7 }}>
-        <span style={{ fontSize: 18, fontWeight: 800, color: col, letterSpacing: '-0.5px' }}>
-          ${bar.close.toFixed(2)}
-        </span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: col }}>
-          {isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%
-        </span>
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+      <span style={{ color: '#9ca3af', fontSize: 10, whiteSpace: 'nowrap' }}>{date}</span>
+      <span style={{ fontSize: 15, fontWeight: 800, color: col, letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
+        ${bar.close.toFixed(2)}
+      </span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: col, whiteSpace: 'nowrap' }}>
+        {isUp ? '▲' : '▼'} {Math.abs(pct).toFixed(2)}%
+      </span>
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px',
-        paddingTop: 6, borderTop: '1px solid #f1f5f9', marginBottom: 6,
+        display: 'flex', gap: 8, paddingLeft: 10,
+        borderLeft: '1px solid #e5e7eb', fontSize: 11, whiteSpace: 'nowrap',
       }}>
-        {[
-          { l: 'Open',  v: bar.open,  c: '#6b7280' },
-          { l: 'High',  v: bar.high,  c: '#059669' },
-          { l: 'Low',   v: bar.low,   c: '#dc2626' },
-          { l: 'Close', v: bar.close, c: col },
-        ].map(({ l, v, c }) => (
-          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-            <span style={{ color: '#9ca3af' }}>{l}</span>
+        {([
+          { l: 'O', v: bar.open,  c: '#6b7280' },
+          { l: 'H', v: bar.high,  c: '#059669' },
+          { l: 'L', v: bar.low,   c: '#dc2626' },
+          { l: 'C', v: bar.close, c: col },
+        ] as { l: string; v: number; c: string }[]).map(({ l, v, c }) => (
+          <span key={l}>
+            <span style={{ color: '#9ca3af' }}>{l} </span>
             <span style={{ color: c, fontWeight: 600 }}>${v.toFixed(2)}</span>
-          </div>
+          </span>
         ))}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 5, borderTop: '1px solid #f1f5f9' }}>
-        <span style={{ color: '#9ca3af' }}>Vol</span>
-        <span style={{ color: '#2563eb', fontWeight: 600 }}>{vol}</span>
+        <span>
+          <span style={{ color: '#9ca3af' }}>Vol </span>
+          <span style={{ color: '#2563eb', fontWeight: 600 }}>{vol}</span>
+        </span>
       </div>
     </div>
   );
@@ -323,21 +316,21 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
   return (
     <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
 
-      {/* Header */}
+      {/* Header — title | OHLCV strip | toggles */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 16,
+        padding: '10px 20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0,
       }}>
-        <span className="card-header" style={{ marginBottom: 0 }}>Price Chart</span>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <span className="card-header" style={{ marginBottom: 0, flexShrink: 0 }}>Price Chart</span>
+        <OHLCVCard ref={cardRef} initial={lastBar} />
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           <Pill label="BB"  active={showBB}  color="#10b981" onClick={() => setShowBB(v => !v)} />
           <Pill label="MAs" active={showSMA} color="#3b82f6" onClick={() => setShowSMA(v => !v)} />
         </div>
       </div>
 
       {/* Chart container */}
-      <div style={{ position: 'relative', flexShrink: 0 }}>
-        <OHLCVCard ref={cardRef} initial={lastBar} />
+      <div style={{ flexShrink: 0 }}>
         <div ref={containerRef} />
       </div>
 
