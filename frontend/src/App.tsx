@@ -57,7 +57,7 @@ export default function App() {
     }
   }, []);
 
-  // Live price polling every 5 min
+  // Live price polling every 15 seconds
   useEffect(() => {
     if (!ticker) return;
     const poll = async () => {
@@ -65,13 +65,13 @@ export default function App() {
         const p = await fetchPrice(ticker);
         if (p.price) {
           setLivePrice(p.price);
-          setLiveChange(p.change || 0);
-          setLiveChangePct(p.change_pct || 0);
+          setLiveChange(p.change ?? 0);
+          setLiveChangePct(p.change_pct ?? 0);
         }
       } catch { /* ignore */ }
     };
     poll();
-    priceInterval.current = setInterval(poll, 300000);
+    priceInterval.current = setInterval(poll, 15000);
     return () => { if (priceInterval.current) clearInterval(priceInterval.current); };
   }, [ticker]);
 
