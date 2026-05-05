@@ -124,7 +124,7 @@ export default function StockSearch({ onSearch, loading }: Props) {
                 onChange={e => setValue(e.target.value.toUpperCase())}
                 onKeyDown={handleKey}
                 onFocus={() => { if (results.length > 0) setOpen(true); }}
-                placeholder="Search ticker or company name…"
+                placeholder="Search Stock"
                 autoComplete="off"
                 spellCheck={false}
                 style={{ paddingLeft: 38, paddingRight: value ? 34 : 12, width: '100%', fontSize: 14, fontWeight: 500 }}

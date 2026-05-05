@@ -236,7 +236,6 @@ export default function App() {
               ))}
             </div>
             <div style={{ marginTop: 28, fontSize: 12, color: '#374151' }}>
-              Try: AAPL · TSLA · NVDA · SPY · BTC-USD
             </div>
           </div>
         )}
