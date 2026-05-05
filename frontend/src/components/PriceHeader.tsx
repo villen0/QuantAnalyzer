@@ -47,7 +47,7 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
           {/* Name + live price */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 24, fontWeight: 800, color: '#111827' }}>{info.ticker}</span>
+              <span style={{ fontSize: 24, fontWeight: 800, color: '#10b981' }}>{info.ticker}</span>
               <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 400 }}>{info.name}</span>
               {/* LIVE indicator */}
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#10b981', letterSpacing: '0.08em' }}>
@@ -65,7 +65,7 @@ export default function PriceHeader({ info, livePrice, liveChange, liveChangePct
               animation: flash ? `priceFlash${flash === 'up' ? 'Up' : 'Down'} 0.8s ease-out` : undefined,
             }}>
               <span style={{
-                fontSize: 38, fontWeight: 800, color: '#111827', letterSpacing: '-1.5px',
+                fontSize: 38, fontWeight: 800, color: '#10b981', letterSpacing: '-1.5px',
                 transition: 'color 0.3s ease',
               }}>
                 ${price?.toFixed(2) ?? '—'}

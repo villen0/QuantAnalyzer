@@ -124,7 +124,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
+    <div style={{ minHeight: '100vh', background: '#000000' }}>
       <StockSearch onSearch={handleSearch} loading={loading} />
 
       {data && (
