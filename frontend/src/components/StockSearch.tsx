@@ -92,8 +92,8 @@ export default function StockSearch({ onSearch, loading }: Props) {
   };
 
   return (
-    <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '14px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+    <div style={{ background: '#ffffff', borderBottom: '1px solid #e5e7eb', padding: '10px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 8, flexShrink: 0 }}>

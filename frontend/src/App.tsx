@@ -11,10 +11,9 @@ import QuantStrategyPanel from './components/QuantStrategyPanel';
 import { fetchDashboard, fetchAnalysis, fetchPrice, fetchSMCAnalysis, fetchQuantStrategy } from './api/client';
 import type { DashboardData, AIAnalysis, SMCAnalysis, QuantStrategy } from './types';
 
-type Tab = 'overview' | 'indicators' | 'news';
+type Tab = 'indicators' | 'news';
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'overview',   label: 'Overview'  },
   { key: 'indicators', label: 'Technical' },
   { key: 'news',       label: 'News'      },
 ];
@@ -22,7 +21,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const [ticker, setTicker] = useState('');
   const [period, setPeriod] = useState('3mo');
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('indicators');
   const [data, setData] = useState<DashboardData | null>(null);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [smcAnalysis, setSmcAnalysis] = useState<SMCAnalysis | null>(null);
@@ -124,7 +123,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#000000' }}>
+    <div style={{ minHeight: '100vh', background: '#87CEEB' }}>
       <StockSearch onSearch={handleSearch} loading={loading} />
 
       {data && (
@@ -158,9 +157,9 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 16px' }}>
         {loading && (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
             <div style={{ fontSize: 15, marginBottom: 8, color: '#6b7280' }}>Loading {ticker}...</div>
             <div style={{ fontSize: 12, color: '#9ca3af' }}>Fetching price data, indicators & news</div>
           </div>
@@ -174,66 +173,25 @@ export default function App() {
 
         {!loading && data && (
           <>
-            {tab === 'overview' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
-                {/* Left column */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <PriceChart
-                    data={data.chart}
-                    indicators={data.indicators}
-                    period={period}
-                    onPeriodChange={handlePeriodChange}
-                  />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                    <IndicatorPanel indicators={data.indicators} chartData={data.chart} />
-                    <NewsPanel news={data.news} />
-                  </div>
-                  {data.indicators.smc && (
-                    <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
-                  )}
-                </div>
-
-                {/* Right column */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
-                  <QuantStrategyPanel
-                    data={quantStrategy}
-                    loading={quantLoading}
-                    onRun={handleRunQuantStrategy}
-                  />
-                  <AIDecision
-                    analysis={analysis}
-                    onAnalyze={handleAnalyze}
-                    analyzing={analyzing}
-                    ticker={ticker}
-                  />
-                </div>
-              </div>
-            )}
-
             {tab === 'indicators' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div className="main-grid">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <PriceChart data={data.chart} indicators={data.indicators} period={period} onPeriodChange={handlePeriodChange} />
                   <IndicatorPanel indicators={data.indicators} chartData={data.chart} />
                   {data.indicators.smc && (
                     <SMCPanel smc={data.indicators.smc} currentPrice={data.indicators.current_price} />
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SMCAnalysisPanel smc={smcAnalysis} loading={loading} smcLoading={smcLoading} onRunAnalysis={handleRunSMCAnalysis} />
-                  <QuantStrategyPanel
-                    data={quantStrategy}
-                    loading={quantLoading}
-                    onRun={handleRunQuantStrategy}
-                  />
+                  <QuantStrategyPanel data={quantStrategy} loading={quantLoading} onRun={handleRunQuantStrategy} />
                   <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
                 </div>
               </div>
             )}
 
             {tab === 'news' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20 }}>
+              <div className="main-grid">
                 <NewsPanel news={data.news} />
                 <AIDecision analysis={analysis} onAnalyze={handleAnalyze} analyzing={analyzing} ticker={ticker} />
               </div>
@@ -242,7 +200,7 @@ export default function App() {
         )}
 
         {!loading && !data && !error && (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ textAlign: 'center', padding: '40px 16px' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: 68, height: 68, borderRadius: 18, marginBottom: 22,
@@ -251,37 +209,32 @@ export default function App() {
             }}>
               <span style={{ fontSize: 30 }}>📈</span>
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#111827', marginBottom: 10, letterSpacing: '-0.4px' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 10, letterSpacing: '-0.4px' }}>
               Welcome to QuantAnalyzer
             </div>
-            <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 44, maxWidth: 460, margin: '0 auto 44px' }}>
-              Search any stock or ETF in the bar above to get real-time data,
+            <div style={{ fontSize: 14, color: '#374151', marginBottom: 32, maxWidth: 460, margin: '0 auto 32px' }}>
+              Search any stock or ETF to get real-time data,
               technical analysis, SMC signals, and AI-powered trade decisions.
             </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 14, maxWidth: 800, margin: '0 auto',
-            }}>
+            <div className="feature-grid">
               {[
-                { icon: '🕯️', title: 'Live Charts',   desc: 'Candlestick charts with EMA, Bollinger Bands & volume' },
-                { icon: '🧠', title: 'AI Analysis',    desc: 'Groq-powered reasoning with a clear BUY / SELL / HOLD verdict' },
+                { icon: '🕯️', title: 'Live Charts',   desc: 'Candlestick charts with Bollinger Bands & volume' },
+                { icon: '🧠', title: 'AI Analysis',    desc: 'Groq-powered BUY / SELL / HOLD verdict' },
                 { icon: '🏦', title: 'SMC Strategy',   desc: 'Order blocks, FVGs, BOS/CHoCH and liquidity zones' },
-                { icon: '📊', title: 'Quant Strategy', desc: 'MA200 + RSI pullback system with full backtesting metrics' },
+                { icon: '📊', title: 'Quant Strategy', desc: 'MA200 + RSI pullback system with backtesting' },
               ].map(f => (
                 <div key={f.title} style={{
                   background: '#ffffff', border: '1px solid #e5e7eb',
-                  borderRadius: 12, padding: '18px 16px', textAlign: 'left',
-                  transition: 'border-color 0.2s',
+                  borderRadius: 12, padding: '16px 14px', textAlign: 'left',
                 }}>
-                  <div style={{ fontSize: 22, marginBottom: 8 }}>{f.icon}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 5 }}>{f.title}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>{f.desc}</div>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>{f.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 4 }}>{f.title}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>{f.desc}</div>
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 36, fontSize: 12, color: '#9ca3af' }}>
-              Try searching: AAPL · TSLA · NVDA · SPY · BTC-USD
+            <div style={{ marginTop: 28, fontSize: 12, color: '#374151' }}>
+              Try: AAPL · TSLA · NVDA · SPY · BTC-USD
             </div>
           </div>
         )}
