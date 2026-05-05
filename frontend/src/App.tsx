@@ -77,7 +77,7 @@ export default function App() {
 
   const handleSearch = (t: string) => {
     setTicker(t);
-    setTab('overview');
+    setTab('indicators');
     loadData(t, period);
   };
 
