@@ -335,7 +335,7 @@ export default function PriceChart({ data, indicators, period, onPeriodChange }:
       </div>
 
       {/* Period tabs */}
-      <div style={{ display: 'flex', borderTop: '1px solid #f1f5f9', flexShrink: 0 }}>
+      <div style={{ display: 'flex', borderTop: '1px solid #f1f5f9', flexShrink: 0, overflowX: 'auto' }}>
         {PERIODS.map(btn => {
           const active = btn.api === period;
           return (
