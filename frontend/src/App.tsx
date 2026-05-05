@@ -42,13 +42,13 @@ export default function App() {
     setAnalysis(null);
     setSmcAnalysis(null);
     setQuantStrategy(null);
-    setLivePrice(null);
     try {
       const d = await fetchDashboard(t, p);
       setData(d);
       if (d.smc_analysis) setSmcAnalysis(d.smc_analysis);
+      // Only set price from dashboard if we don't already have a live price
       if (d.info?.current_price) {
-        setLivePrice(d.info.current_price);
+        setLivePrice(prev => prev ?? d.info.current_price);
       }
     } catch (e: any) {
       setError(e?.response?.data?.detail || e?.message || 'Failed to load data');
@@ -57,7 +57,7 @@ export default function App() {
     }
   }, []);
 
-  // Live price polling every 5 min
+  // Live price polling every 15 seconds
   useEffect(() => {
     if (!ticker) return;
     const poll = async () => {
@@ -65,19 +65,22 @@ export default function App() {
         const p = await fetchPrice(ticker);
         if (p.price) {
           setLivePrice(p.price);
-          setLiveChange(p.change || 0);
-          setLiveChangePct(p.change_pct || 0);
+          setLiveChange(p.change ?? 0);
+          setLiveChangePct(p.change_pct ?? 0);
         }
       } catch { /* ignore */ }
     };
     poll();
-    priceInterval.current = setInterval(poll, 300000);
+    priceInterval.current = setInterval(poll, 15000);
     return () => { if (priceInterval.current) clearInterval(priceInterval.current); };
   }, [ticker]);
 
   const handleSearch = (t: string) => {
     setTicker(t);
     setTab('indicators');
+    setLivePrice(null);
+    setLiveChange(0);
+    setLiveChangePct(0);
     loadData(t, period);
   };
 
