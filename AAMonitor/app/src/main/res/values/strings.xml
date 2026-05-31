@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AA Monitor</string>
+    <string name="status_disconnected">Disconnected — select your ELM327 adapter below</string>
+    <string name="status_connecting">Connecting to adapter…</string>
+    <string name="status_connected">Connected — plug phone into car for Android Auto</string>
+    <string name="status_error_prefix">Error: </string>
+    <string name="paired_devices_label">Select your ELM327 Bluetooth OBD-II adapter:</string>
+    <string name="no_devices">No paired Bluetooth devices found.\nPair your ELM327 adapter in phone Settings → Bluetooth first.</string>
+    <string name="notification_text">Reading OBD-II data…</string>
+    <string name="channel_name">OBD Monitor</string>
+    <string name="perm_rationale">Bluetooth permission is needed to connect to your OBD-II adapter.</string>
+</resources>

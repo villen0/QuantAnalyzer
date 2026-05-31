@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#111111">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="AA Performance Monitor"
+        android:textSize="22sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:paddingBottom="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Shows RPM · Speed · Coolant Temp · Throttle on Android Auto"
+        android:textSize="13sp"
+        android:textColor="#AAAAAA"
+        android:paddingBottom="16dp" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Disconnected — select your ELM327 adapter below"
+        android:textSize="14sp"
+        android:textColor="#FFCC00"
+        android:paddingBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Paired Bluetooth Devices:"
+        android:textSize="15sp"
+        android:textColor="#FFFFFF"
+        android:paddingBottom="8dp" />
+
+    <ListView
+        android:id="@+id/deviceList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:dividerHeight="1dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tip: Pair your ELM327 in phone Settings → Bluetooth first, then select it above."
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:paddingTop="12dp" />
+
+</LinearLayout>

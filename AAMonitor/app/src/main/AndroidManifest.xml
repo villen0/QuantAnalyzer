@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Bluetooth (legacy API ≤30) -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- Bluetooth (API 31+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
+    <!-- Car App Library surface rendering -->
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+
+    <application
+        android:name=".MainApplication"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar">
+
+        <!-- Phone-side launcher: BT device picker and status -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- CarAppService — NAVIGATION category required for NavigationTemplate + surface -->
+        <service
+            android:name=".car.MonitorCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.car.app.minCarApiLevel"
+                android:value="2" />
+        </service>
+
+        <!-- OBD-II Bluetooth foreground service -->
+        <service
+            android:name=".obd.ObdService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- automotive_app_desc required by Car App Library host -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+    </application>
+
+</manifest>
