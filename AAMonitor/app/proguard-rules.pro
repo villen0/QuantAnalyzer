@@ -1,2 +1,0 @@
--keep class com.example.aamonitor.** { *; }
--keep class androidx.car.app.** { *; }
